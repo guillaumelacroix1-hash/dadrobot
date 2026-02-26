@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Simulation Robot - Graph</title>
+  <title>Simulation Robot - Graph (EUR)</title>
 
   <!-- Chart.js (CDN) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -40,10 +40,7 @@
     .sub{color:var(--muted);font-size:13px;line-height:1.4;margin:0 0 14px 0}
 
     label{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
-    input[type="number"], input[type="range"]{
-      width:100%;
-      box-sizing:border-box;
-    }
+    input[type="number"], input[type="range"]{width:100%;box-sizing:border-box;}
     input[type="number"]{
       background:rgba(0,0,0,0.25);
       border:1px solid rgba(255,255,255,0.10);
@@ -111,12 +108,12 @@
 
         <div class="row">
           <div>
-            <label>Capital initial ($)</label>
+            <label>Capital initial (€)</label>
             <input id="initial" type="number" step="0.01" value="464.48" />
           </div>
           <div>
-            <label>Ajout mensuel ($)</label>
-            <input id="monthlyAdd" type="number" step="0.01" value="160" />
+            <label>Ajout mensuel (€)</label>
+            <input id="monthlyAdd" type="number" step="0.01" value="150" />
           </div>
         </div>
 
@@ -142,7 +139,7 @@
             <div class="v" id="kpiTotal">—</div>
           </div>
           <div class="kpi">
-            <div class="t">Moyenne journalière utilisée</div>
+            <div class="t">Rendement journalier utilisé</div>
             <div class="v" id="kpiAvg">—</div>
           </div>
         </div>
@@ -165,7 +162,11 @@
   const $ = (id) => document.getElementById(id);
 
   function money(n){
-    return new Intl.NumberFormat('fr-FR', { style:'currency', currency:'USD', maximumFractionDigits:0 }).format(n);
+    return new Intl.NumberFormat('fr-FR', {
+      style:'currency',
+      currency:'EUR',
+      maximumFractionDigits:0
+    }).format(n);
   }
 
   function simulate({ initial, monthlyAdd, dailyReturnPct, months }) {
