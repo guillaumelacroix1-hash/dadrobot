@@ -1,267 +1,327 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Simulation Robot - Graph (EUR)</title>
-
-  <!-- Chart.js (CDN) -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-
-  <style>
-    :root{
-      --bg:#0b1220;
-      --card:#101a2e;
-      --text:#e8eefc;
-      --muted:#a9b6d3;
-      --accent:#2df6b5;
-      --blue:#5aa7ff;
-      --line:#23314f;
-      --radius:18px;
-    }
-    body{
-      margin:0;
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Apple Color Emoji","Segoe UI Emoji";
-      background: radial-gradient(1200px 800px at 15% 10%, #142447 0%, var(--bg) 55%);
-      color:var(--text);
-    }
-    .wrap{max-width:1100px;margin:0 auto;padding:24px;display:grid;gap:18px}
-    .grid{display:grid;gap:18px}
-    @media(min-width:900px){ .grid{grid-template-columns: 380px 1fr; align-items:start;} }
-
-    .card{
-      background:linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
-      border:1px solid rgba(255,255,255,0.06);
-      border-radius:var(--radius);
-      box-shadow:0 12px 30px rgba(0,0,0,0.35);
-      padding:18px;
-    }
-    h1{font-size:18px;margin:0 0 10px 0}
-    .sub{color:var(--muted);font-size:13px;line-height:1.4;margin:0 0 14px 0}
-
-    label{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
-    input[type="number"], input[type="range"]{width:100%;box-sizing:border-box;}
-    input[type="number"]{
-      background:rgba(0,0,0,0.25);
-      border:1px solid rgba(255,255,255,0.10);
-      color:var(--text);
-      padding:10px 12px;
-      border-radius:12px;
-      outline:none;
-    }
-    input[type="range"]{accent-color:var(--accent)}
-    .row{display:flex;gap:10px}
-    .row > div{flex:1}
-    .pill{
-      display:inline-flex; align-items:center; gap:8px;
-      background:rgba(0,0,0,0.25);
-      border:1px solid rgba(255,255,255,0.10);
-      padding:8px 10px;
-      border-radius:999px;
-      font-size:12px;
-      color:var(--muted);
-    }
-    .kpis{display:grid;grid-template-columns:1fr;gap:10px;margin-top:14px}
-    @media(min-width:420px){ .kpis{grid-template-columns:1fr 1fr} }
-
-    .kpi{
-      background:rgba(0,0,0,0.18);
-      border:1px solid rgba(255,255,255,0.08);
-      border-radius:14px;
-      padding:12px;
-    }
-    .kpi .t{font-size:12px;color:var(--muted)}
-    .kpi .v{font-size:18px;margin-top:6px}
-    .legend{
-      display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;color:var(--muted);font-size:12px
-    }
-    .dot{width:10px;height:10px;border-radius:99px;display:inline-block;margin-right:6px}
-    .dot.a{background:var(--accent)}
-    .dot.b{background:var(--blue)}
-    .dot.c{background:#ffffff}
-    canvas{width:100% !important; height:420px !important;}
-    .foot{color:var(--muted);font-size:12px;margin-top:10px}
-    .btn{
-      margin-top:14px;
-      width:100%;
-      border:none;
-      background:var(--accent);
-      color:#032116;
-      font-weight:700;
-      padding:10px 12px;
-      border-radius:12px;
-      cursor:pointer;
-    }
-    .btn:active{transform:translateY(1px)}
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulateur de Rendement Crypto</title>
+    
+    <!-- Tailwind CSS pour le design -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    
+    <!-- Chart.js pour le graphique -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
+<body class="min-h-screen bg-slate-900 text-slate-100 p-4 md:p-8 font-sans">
 
-<body>
-  <div class="wrap">
-    <div class="grid">
-      <div class="card">
-        <h1>Simulation Robot (composé 50% / wallet 50%)</h1>
-        <p class="sub">
-          Hypothèse : rendement journalier constant. Chaque jour : 50% des profits sont réinvestis, 50% partent au wallet.
-          Ajout mensuel appliqué en fin de mois (30 jours).
-        </p>
-
-        <div class="row">
-          <div>
-            <label>Capital initial (€)</label>
-            <input id="initial" type="number" step="0.01" value="464.48" />
-          </div>
-          <div>
-            <label>Ajout mensuel (€)</label>
-            <input id="monthlyAdd" type="number" step="0.01" value="150" />
-          </div>
+    <div class="max-w-6xl mx-auto space-y-6">
+        
+        <!-- Header -->
+        <div class="flex items-center space-x-3 mb-8">
+            <i data-lucide="trending-up" class="w-8 h-8 text-emerald-400"></i>
+            <h1 class="text-2xl md:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400">
+                Simulateur de Rendement (Robot Crypto)
+            </h1>
         </div>
 
-        <label>Rendement journalier (%) <span class="pill" id="dailyLbl">1.5%</span></label>
-        <input id="dailyReturn" type="range" min="0.1" max="3.0" step="0.1" value="1.5" />
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+            <!-- Panneau de configuration (Gauche) -->
+            <div class="bg-slate-800 rounded-2xl p-6 shadow-xl border border-slate-700 space-y-6">
+                <div class="flex items-center space-x-2 border-b border-slate-700 pb-3">
+                    <i data-lucide="settings" class="w-5 h-5 text-slate-400"></i>
+                    <h2 class="text-lg font-semibold">Paramètres</h2>
+                </div>
 
-        <label>Durée (mois) <span class="pill" id="monthsLbl">12</span></label>
-        <input id="months" type="range" min="1" max="24" step="1" value="12" />
+                <!-- Input Capital Initial -->
+                <div class="space-y-2">
+                    <label class="text-sm text-slate-400 flex justify-between">
+                        <span>Capital Initial (€)</span>
+                    </label>
+                    <div class="relative">
+                        <i data-lucide="euro" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500"></i>
+                        <input type="number" id="initialCapital" value="450" class="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 pl-10 pr-4 focus:ring-2 focus:ring-emerald-500 outline-none transition text-white">
+                    </div>
+                </div>
 
-        <button class="btn" id="recalc">Recalculer</button>
+                <!-- Input Rendement Moyen -->
+                <div class="space-y-2">
+                    <label class="text-sm text-slate-400 flex justify-between">
+                        <span>Rendement journalier moyen (%)</span>
+                        <span id="dailyReturnLabel" class="text-emerald-400 font-medium">1.35%</span>
+                    </label>
+                    <input type="range" id="dailyReturn" min="0.1" max="5" step="0.05" value="1.35" class="w-full accent-emerald-500">
+                    <p class="text-xs text-slate-500 flex items-start gap-1 mt-1">
+                        <i data-lucide="info" class="w-3 h-3 mt-0.5 shrink-0"></i>
+                        Moyenne calculée : ~1.35%
+                    </p>
+                </div>
 
-        <div class="kpis">
-          <div class="kpi">
-            <div class="t">Capital robot (fin période)</div>
-            <div class="v" id="kpiRobot">—</div>
-          </div>
-          <div class="kpi">
-            <div class="t">Wallet cumulé (fin période)</div>
-            <div class="v" id="kpiWallet">—</div>
-          </div>
-          <div class="kpi">
-            <div class="t">Total (robot + wallet)</div>
-            <div class="v" id="kpiTotal">—</div>
-          </div>
-          <div class="kpi">
-            <div class="t">Rendement journalier utilisé</div>
-            <div class="v" id="kpiAvg">—</div>
-          </div>
+                <!-- Input Règle des 50/50 -->
+                <div class="space-y-2">
+                    <label class="text-sm text-slate-400 flex justify-between">
+                        <span>Réinvestissement (Robot) (%)</span>
+                        <span id="reinvestmentRateLabel" class="text-cyan-400 font-medium">50%</span>
+                    </label>
+                    <input type="range" id="reinvestmentRate" min="0" max="100" step="5" value="50" class="w-full accent-cyan-500">
+                    <p class="text-xs text-slate-500">
+                        Le reste (<span id="walletRateLabel">50%</span>) part dans le Wallet.
+                    </p>
+                </div>
+
+                <!-- Input Ajout Mensuel -->
+                <div class="space-y-2">
+                    <label class="text-sm text-slate-400 flex justify-between">
+                        <span>Ajout manuel mensuel (€)</span>
+                    </label>
+                    <div class="relative">
+                        <i data-lucide="euro" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500"></i>
+                        <input type="number" id="monthlyAddition" value="150" class="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 pl-10 pr-4 focus:ring-2 focus:ring-emerald-500 outline-none transition text-white">
+                    </div>
+                </div>
+
+                <!-- Input Durée -->
+                <div class="space-y-2">
+                    <label class="text-sm text-slate-400 flex justify-between">
+                        <span>Durée de la projection (Mois)</span>
+                        <span id="durationLabel" class="text-purple-400 font-medium">12 mois</span>
+                    </label>
+                    <input type="range" id="durationMonths" min="1" max="24" step="1" value="12" class="w-full accent-purple-500">
+                </div>
+
+            </div>
+
+            <!-- Zone de résultats (Droite) -->
+            <div class="lg:col-span-2 space-y-6">
+            
+                <!-- Cartes de résumé -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="bg-slate-800 p-5 rounded-2xl border border-emerald-500/30 relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition">
+                            <i data-lucide="piggy-bank" class="w-16 h-16 text-emerald-500"></i>
+                        </div>
+                        <h3 class="text-sm text-slate-400 font-medium">Capital Final (Robot)</h3>
+                        <p id="finalCapital" class="text-2xl font-bold text-emerald-400 mt-1">0,00 €</p>
+                        <p class="text-xs text-slate-500 mt-2">Intérêts composés inclus</p>
+                    </div>
+
+                    <div class="bg-slate-800 p-5 rounded-2xl border border-cyan-500/30 relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition">
+                            <i data-lucide="wallet" class="w-16 h-16 text-cyan-500"></i>
+                        </div>
+                        <h3 class="text-sm text-slate-400 font-medium">Total Sécurisé (Wallet)</h3>
+                        <p id="finalWallet" class="text-2xl font-bold text-cyan-400 mt-1">0,00 €</p>
+                        <p class="text-xs text-slate-500 mt-2">Prêt à être retiré</p>
+                    </div>
+
+                    <div class="bg-slate-800 p-5 rounded-2xl border border-purple-500/30 relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition">
+                            <i data-lucide="trending-up" class="w-16 h-16 text-purple-500"></i>
+                        </div>
+                        <h3 class="text-sm text-slate-400 font-medium">Bénéfice Net Total</h3>
+                        <p id="finalNetProfit" class="text-2xl font-bold text-purple-400 mt-1">0,00 €</p>
+                        <p class="text-xs text-slate-500 mt-2">Total accumulé - Total investi</p>
+                    </div>
+                </div>
+
+                <!-- Graphique -->
+                <div class="bg-slate-800 rounded-2xl p-6 shadow-xl border border-slate-700">
+                    <h2 class="text-lg font-semibold mb-6 flex items-center gap-2">
+                        <i data-lucide="calendar" class="w-5 h-5 text-slate-400"></i>
+                        Évolution sur <span id="chartTitleMonths">12</span> mois
+                    </h2>
+                    <div class="h-80 w-full relative">
+                        <canvas id="simulationChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Disclaimer -->
+                <div class="bg-slate-800/50 rounded-xl p-4 border border-slate-700/50 flex gap-3 text-sm text-slate-400">
+                    <i data-lucide="info" class="w-5 h-5 text-slate-500 shrink-0"></i>
+                    <p>
+                        <strong>Avertissement :</strong> Cette simulation est purement mathématique. Un rendement quotidien de 1.35% génère des intérêts composés très puissants sur la durée. Garde à l'esprit que dans la réalité (trading/crypto), les performances passées ne garantissent pas les rendements futurs et que le capital comporte des risques.
+                    </p>
+                </div>
+
+            </div>
         </div>
-
-        <div class="foot">⚠️ Projection mathématique uniquement (pas une garantie de rendement).</div>
-      </div>
-
-      <div class="card">
-        <div class="legend">
-          <span><span class="dot a"></span>Robot</span>
-          <span><span class="dot b"></span>Wallet</span>
-          <span><span class="dot c"></span>Total</span>
-        </div>
-        <canvas id="chart"></canvas>
-      </div>
     </div>
-  </div>
 
-<script>
-  const $ = (id) => document.getElementById(id);
+    <!-- Script de logique -->
+    <script>
+        $(document).ready(function() {
+            // Initialisation des icônes
+            lucide.createIcons();
 
-  function money(n){
-    return new Intl.NumberFormat('fr-FR', {
-      style:'currency',
-      currency:'EUR',
-      maximumFractionDigits:0
-    }).format(n);
-  }
+            let myChart = null;
 
-  function simulate({ initial, monthlyAdd, dailyReturnPct, months }) {
-    let capital = initial;
-    let wallet = 0;
+            // Fonction pour formater en euros
+            const formatCurrency = (value) => {
+                return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(value);
+            };
 
-    const dailyRate = dailyReturnPct / 100;
-    const data = [];
+            // Fonction principale de calcul
+            const calculateSimulation = () => {
+                // Récupération des valeurs
+                const initialCapital = parseFloat($('#initialCapital').val()) || 0;
+                const dailyReturn = parseFloat($('#dailyReturn').val()) || 0;
+                const reinvestmentRate = parseFloat($('#reinvestmentRate').val()) || 0;
+                const monthlyAddition = parseFloat($('#monthlyAddition').val()) || 0;
+                const durationMonths = parseInt($('#durationMonths').val()) || 0;
 
-    for (let m = 1; m <= months; m++) {
-      for (let d = 1; d <= 30; d++) {
-        const profit = capital * dailyRate;
-        const reinvest = profit * 0.5;
-        const withdraw = profit * 0.5;
-        capital += reinvest;
-        wallet += withdraw;
-      }
-      capital += monthlyAdd;
+                // Mise à jour des labels
+                $('#dailyReturnLabel').text(dailyReturn + '%');
+                $('#reinvestmentRateLabel').text(reinvestmentRate + '%');
+                $('#walletRateLabel').text((100 - reinvestmentRate) + '%');
+                $('#durationLabel').text(durationMonths + ' mois');
+                $('#chartTitleMonths').text(durationMonths);
 
-      data.push({
-        month: `M${m}`,
-        robot: Math.round(capital),
-        wallet: Math.round(wallet),
-        total: Math.round(capital + wallet),
-      });
-    }
-    return data;
-  }
+                // Variables de calcul
+                let currentCapital = initialCapital;
+                let accumulatedWallet = 0;
+                const daysInMonth = 30;
+                const totalDays = durationMonths * daysInMonth;
 
-  let chart;
+                // Données pour le graphique
+                const labels = ["Mois 0"];
+                const capitalData = [Math.round(currentCapital * 100) / 100];
+                const walletData = [0];
 
-  function render(){
-    const initial = parseFloat($('initial').value || '0');
-    const monthlyAdd = parseFloat($('monthlyAdd').value || '0');
-    const dailyReturnPct = parseFloat($('dailyReturn').value || '0');
-    const months = parseInt($('months').value || '12', 10);
+                // Boucle jour par jour
+                for (let day = 1; day <= totalDays; day++) {
+                    const dailyProfit = currentCapital * (dailyReturn / 100);
+                    
+                    const reinvested = dailyProfit * (reinvestmentRate / 100);
+                    const toWallet = dailyProfit - reinvested;
 
-    $('dailyLbl').textContent = `${dailyReturnPct.toFixed(1)}%`;
-    $('monthsLbl').textContent = `${months}`;
+                    currentCapital += reinvested;
+                    accumulatedWallet += toWallet;
 
-    const data = simulate({ initial, monthlyAdd, dailyReturnPct, months });
+                    // Ajout mensuel
+                    if (day % daysInMonth === 0) {
+                        currentCapital += monthlyAddition;
+                        
+                        labels.push(`Mois ${day / daysInMonth}`);
+                        capitalData.push(Math.round(currentCapital * 100) / 100);
+                        walletData.push(Math.round(accumulatedWallet * 100) / 100);
+                    }
+                }
 
-    const labels = data.map(d => d.month);
-    const robot = data.map(d => d.robot);
-    const wallet = data.map(d => d.wallet);
-    const total = data.map(d => d.total);
+                // Statistiques finales
+                const finalCapital = capitalData[capitalData.length - 1];
+                const finalWallet = walletData[walletData.length - 1];
+                const totalValue = finalCapital + finalWallet;
+                const totalInvested = initialCapital + (monthlyAddition * durationMonths);
+                const netProfit = totalValue - totalInvested;
 
-    const last = data[data.length - 1] || {robot:0,wallet:0,total:0};
+                // Mise à jour des cartes
+                $('#finalCapital').text(formatCurrency(finalCapital));
+                $('#finalWallet').text(formatCurrency(finalWallet));
+                $('#finalNetProfit').text(formatCurrency(netProfit));
 
-    $('kpiRobot').textContent = money(last.robot);
-    $('kpiWallet').textContent = money(last.wallet);
-    $('kpiTotal').textContent = money(last.total);
-    $('kpiAvg').textContent = `${dailyReturnPct.toFixed(1)}% / jour`;
+                // Mise à jour du graphique
+                updateChart(labels, capitalData, walletData);
+            };
 
-    const ctx = $('chart');
+            // Fonction pour mettre à jour Chart.js
+            const updateChart = (labels, capitalData, walletData) => {
+                const ctx = document.getElementById('simulationChart').getContext('2d');
+                
+                if (myChart) {
+                    myChart.destroy();
+                }
 
-    if (chart) chart.destroy();
+                myChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Capital (Robot)',
+                                data: capitalData,
+                                borderColor: '#10b981',
+                                backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                                borderWidth: 3,
+                                fill: true,
+                                tension: 0.4,
+                                pointBackgroundColor: '#10b981'
+                            },
+                            {
+                                label: 'Gains (Wallet)',
+                                data: walletData,
+                                borderColor: '#06b6d4',
+                                backgroundColor: 'rgba(6, 182, 212, 0.2)',
+                                borderWidth: 3,
+                                fill: true,
+                                tension: 0.4,
+                                pointBackgroundColor: '#06b6d4'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                        plugins: {
+                            legend: {
+                                labels: { color: '#e2e8f0', font: { family: 'sans-serif' } }
+                            },
+                            tooltip: {
+                                backgroundColor: '#1e293b',
+                                titleColor: '#f8fafc',
+                                bodyColor: '#f8fafc',
+                                borderColor: '#334155',
+                                borderWidth: 1,
+                                padding: 10,
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            label += formatCurrency(context.parsed.y);
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                grid: { color: '#334155', drawBorder: false },
+                                ticks: { color: '#94a3b8' }
+                            },
+                            y: {
+                                grid: { color: '#334155', drawBorder: false },
+                                ticks: { 
+                                    color: '#94a3b8',
+                                    callback: function(value) {
+                                        return value >= 1000 ? (value/1000).toFixed(1) + 'k €' : value + ' €';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            };
 
-    chart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels,
-        datasets: [
-          { label: 'Robot', data: robot, borderWidth: 3, tension: 0.25 },
-          { label: 'Wallet', data: wallet, borderWidth: 3, tension: 0.25 },
-          { label: 'Total', data: total, borderWidth: 3, tension: 0.25 },
-        ]
-      },
-      options: {
-        responsive: true,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => `${ctx.dataset.label}: ${money(ctx.parsed.y)}`
-            }
-          }
-        },
-        scales: {
-          x: { grid: { color: 'rgba(255,255,255,0.08)' }, ticks: { color: 'rgba(232,238,252,0.75)' } },
-          y: { grid: { color: 'rgba(255,255,255,0.08)' }, ticks: { color: 'rgba(232,238,252,0.75)' } }
-        }
-      }
-    });
-  }
+            // Écouteurs d'événements sur tous les inputs
+            $('input').on('input', function() {
+                calculateSimulation();
+            });
 
-  // live update
-  $('dailyReturn').addEventListener('input', render);
-  $('months').addEventListener('input', render);
-  $('initial').addEventListener('change', render);
-  $('monthlyAdd').addEventListener('change', render);
-  $('recalc').addEventListener('click', render);
-
-  render();
-</script>
+            // Lancement initial
+            calculateSimulation();
+        });
+    </script>
 </body>
 </html>
