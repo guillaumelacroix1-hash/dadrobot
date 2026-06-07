@@ -269,12 +269,21 @@ class DebateManager:
             return True
         return False
 
-    def resume(self, debate_id: int) -> bool:
+    async def resume(self, debate_id: int) -> bool:
         rt = self.get(debate_id)
-        if rt:
+        if rt and rt.task and not rt.task.done():
             rt.resume()
             return True
-        return False
+        # Plus de moteur vivant (après Stop ou redémarrage du serveur) : on en
+        # recrée un et on relance — run() repart au tour suivant en lisant la base.
+        d = db.get_debate(debate_id)
+        if not d:
+            return False
+        rt = DebateRuntime(debate_id, d["question"])
+        self.runtimes[debate_id] = rt
+        db.set_debate_status(debate_id, "en cours")
+        rt.task = asyncio.create_task(rt.run())
+        return True
 
     def stop(self, debate_id: int) -> bool:
         rt = self.get(debate_id)

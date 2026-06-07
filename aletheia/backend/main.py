@@ -236,8 +236,8 @@ def pause_debate(debate_id: int):
 
 
 @app.post("/api/debates/{debate_id}/resume", dependencies=[Depends(auth.require_auth)])
-def resume_debate(debate_id: int):
-    return {"ok": manager.resume(debate_id)}
+async def resume_debate(debate_id: int):
+    return {"ok": await manager.resume(debate_id)}
 
 
 @app.post("/api/debates/{debate_id}/stop", dependencies=[Depends(auth.require_auth)])
@@ -311,6 +311,25 @@ def remove_highlight(hid: int):
 def get_outputs():
     """Sorties concrètes : toutes les Fiches Protocole + les pépites épinglées."""
     return {"protocols": db.list_protocols(), "highlights": db.list_highlights()}
+
+
+# ============================================================= Réglages / clés
+class SettingsIn(BaseModel):
+    OPENROUTER_API_KEY: str | None = None
+    ANTHROPIC_API_KEY: str | None = None
+    GROQ_API_KEY: str | None = None
+
+
+@app.get("/api/settings", dependencies=[Depends(auth.require_auth)])
+def get_settings():
+    """État des clés (présence + indice masqué) — jamais la valeur en clair."""
+    return config.keys_status()
+
+
+@app.post("/api/settings", dependencies=[Depends(auth.require_auth)])
+def save_settings(body: SettingsIn):
+    config.set_keys(body.dict())
+    return {"ok": True, "status": config.keys_status()}
 
 
 # =================================================================== WebSocket

@@ -7,13 +7,19 @@
 
 - Projet : **Aletheia**, un laboratoire de **débat multi-agents** (dossier `aletheia/`).
 - Branche de travail : **`claude/ai-debate-framework-setup-9mp1B`** (tout est dessus).
-- Déjà **déployé et accessible** sur le VPS Hostinger du porteur (systemd `aletheia`).
-- **BLOCAGE ACTUEL À RÉGLER** : les identifiants de modèles OpenRouter gratuits étaient
-  périmés (erreur `404 No endpoints found`). Un script de réparation existe :
-  `aletheia/fix_models.py`. **Il a été poussé mais pas encore confirmé exécuté.**
-  → Faire tourner `python fix_models.py` (il réassigne des modèles gratuits valides),
-  recharger le tableau de bord, relancer un débat, vérifier que les praticiens parlent.
-- Possible blocage secondaire : crédit **Anthropic** à activer pour les agents Claude.
+- Déjà **déployé** sur le VPS Hostinger (systemd `aletheia`, **port 8500**, IPv4
+  `148.230.114.24`). Accès **SSH `root@148.230.114.24`** opérationnel (clé en place).
+  Déploiement : `cd /root/dadrobot && git pull && systemctl restart aletheia`.
+- **404 (modèles périmés)** : réglé — `fix_models.py` a tourné. **429 (rate-limit)** : réglé —
+  20 $ de crédit OpenRouter + **retry/back-off** dans `llm.py`.
+- **Refonte UI (juin 2026)** : rendu **markdown** du fil, badge **● EN DIRECT**, boutons
+  contextuels + toasts, reconnexion WebSocket auto, **sélection d'une phrase → pépite**, et
+  onglet **⚙️ Réglages** (saisie des clés API depuis le tableau de bord, écrites dans `.env`
+  via `config.set_keys`).
+- **Reprise de débat** réparée : « Relancer » recrée le moteur après Stop/redémarrage
+  (`DebateManager.resume` async — `orchestrator.py` + route `/resume`).
+- **À discuter / en cours** : critères d'apparition des **pépites** (manuel vs « candidates »
+  proposées par les agents, à valider) ; activer **Groq** (clé à saisir dans ⚙️ Réglages).
 
 ## 1. Vision du porteur (cadre de travail — à respecter)
 

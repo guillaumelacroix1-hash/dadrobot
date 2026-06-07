@@ -6,12 +6,38 @@
   <title>Aletheia — Cénacle de débat</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
+    /* Couleurs de phase (bordure gauche des messages) */
     .phase-cadrage{border-color:#64748b} .phase-position{border-color:#10b981}
     .phase-critique{border-color:#f59e0b} .phase-convergence{border-color:#06b6d4}
     .phase-protocole{border-color:#a855f7} .phase-garde-fou{border-color:#ef4444}
-    .phase-humain{border-color:#eab308;background:#422006}
+    .phase-humain{border-color:#eab308;background:#3f300a}
     .phase-synthese{border-color:#14b8a6;background:#042f2e}
-    .turn-content{white-space:pre-wrap}
+
+    /* Rendu du contenu (markdown) : lisible et aéré */
+    .md{font-size:0.95rem;line-height:1.6;color:#dbe2ea;word-break:break-word}
+    .md p{margin:0.35rem 0}
+    .md h3,.md h4,.md h5{color:#f1f5f9;font-weight:600;margin:0.6rem 0 0.25rem}
+    .md h3{font-size:1.02rem} .md h4{font-size:0.97rem} .md h5{font-size:0.93rem}
+    .md strong{color:#f8fafc;font-weight:600}
+    .md em{color:#cbd5e1}
+    .md ul{list-style:disc;margin:0.3rem 0;padding-left:1.25rem}
+    .md ol{list-style:decimal;margin:0.3rem 0;padding-left:1.4rem}
+    .md li{margin:0.15rem 0}
+    .md blockquote{border-left:3px solid #475569;padding-left:0.7rem;margin:0.4rem 0;color:#94a3b8;font-style:italic}
+    .md code{background:#1e293b;padding:0.05rem 0.3rem;border-radius:0.25rem;font-size:0.85em}
+    .md hr{border:0;border-top:1px solid #334155;margin:0.6rem 0}
+
+    /* Sélection mise en valeur */
+    .liveFeed ::selection{background:#fde047;color:#1e293b}
+
+    /* Pastille live qui respire */
+    @keyframes liveBlink{0%,100%{opacity:1}50%{opacity:.35}}
+    .live-dot{animation:liveBlink 1.4s ease-in-out infinite}
+
+    /* Indicateur « réfléchit » */
+    @keyframes dotPulse{0%,80%,100%{opacity:.2}40%{opacity:1}}
+    .think-dot{animation:dotPulse 1.2s infinite}
+    .think-dot:nth-child(2){animation-delay:.2s}.think-dot:nth-child(3){animation-delay:.4s}
   </style>
 </head>
 <body class="min-h-screen bg-slate-900 text-slate-100 font-sans">
@@ -21,7 +47,8 @@
   <div class="bg-slate-800 rounded-2xl p-8 w-full max-w-sm border border-slate-700 space-y-4">
     <h1 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400">Aletheia</h1>
     <p class="text-sm text-slate-400">Accès protégé. Entre le mot de passe du labo.</p>
-    <input id="loginPwd" type="password" placeholder="Mot de passe" class="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 outline-none focus:ring-2 focus:ring-emerald-500" />
+    <input id="loginPwd" type="password" placeholder="Mot de passe" class="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 px-3 outline-none focus:ring-2 focus:ring-emerald-500"
+      onkeydown="if(event.key==='Enter')doLogin()" />
     <p id="loginErr" class="text-sm text-red-400 hidden"></p>
     <button onclick="doLogin()" class="w-full bg-emerald-600 hover:bg-emerald-500 rounded-lg py-2 font-medium">Entrer</button>
   </div>
@@ -45,6 +72,7 @@
     <button class="tab-btn px-4 py-2 rounded-lg" data-tab="sources">📚 Sources</button>
     <button class="tab-btn px-4 py-2 rounded-lg" data-tab="postulats">📌 Postulats</button>
     <button class="tab-btn px-4 py-2 rounded-lg" data-tab="pepites">💎 Pépites</button>
+    <button class="tab-btn px-4 py-2 rounded-lg" data-tab="reglages">⚙️ Réglages</button>
   </div>
 
   <!-- ===================== DÉBATS ===================== -->
@@ -62,24 +90,28 @@
       </div>
       <div class="md:col-span-2 bg-slate-800 rounded-2xl p-4 border border-slate-700 min-h-[300px]">
         <div id="liveHeader" class="hidden mb-3">
-          <div class="flex items-center justify-between">
-            <div>
-              <span class="text-xs text-slate-500">Débat #<span id="liveId"></span> ·
-                <span id="liveStatus" class="font-medium"></span> · tour <span id="liveRound">0</span>
-                <span id="consensusBadge" class="hidden ml-1 px-1.5 py-0.5 rounded text-[10px]"></span></span>
-              <p id="liveQuestion" class="text-sm font-medium"></p>
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 flex-wrap text-xs text-slate-500">
+                <span>Débat #<span id="liveId"></span></span>
+                <span id="liveBadge" class="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-600/30 text-slate-400">—</span>
+                <span>tour <span id="liveRound">0</span></span>
+                <span id="consensusBadge" class="hidden px-1.5 py-0.5 rounded text-[10px]"></span>
+              </div>
+              <p id="liveQuestion" class="text-sm font-medium mt-1 max-h-20 overflow-y-auto pr-1"></p>
             </div>
-            <div class="flex gap-1">
-              <button onclick="ctrl('pause')" class="px-2 py-1 rounded bg-amber-600/80 hover:bg-amber-500 text-xs">⏸️</button>
-              <button onclick="ctrl('resume')" class="px-2 py-1 rounded bg-emerald-600/80 hover:bg-emerald-500 text-xs">▶️ Relancer</button>
-              <button onclick="openCalibrate()" class="px-2 py-1 rounded bg-cyan-600/80 hover:bg-cyan-500 text-xs">🎛️ Calibrer</button>
-              <button onclick="ctrl('stop')" class="px-2 py-1 rounded bg-red-600/80 hover:bg-red-500 text-xs">⏹️</button>
+            <div class="flex gap-1 shrink-0">
+              <button id="btnPause" onclick="ctrl('pause')" title="Mettre en pause" class="px-2 py-1 rounded bg-amber-600/80 hover:bg-amber-500 text-xs">⏸️</button>
+              <button id="btnResume" onclick="ctrl('resume')" title="Relancer / reprendre" class="px-2 py-1 rounded bg-emerald-600/80 hover:bg-emerald-500 text-xs">▶️ Relancer</button>
+              <button id="btnCalibrate" onclick="openCalibrate()" title="Calibrer" class="px-2 py-1 rounded bg-cyan-600/80 hover:bg-cyan-500 text-xs">🎛️</button>
+              <button id="btnStop" onclick="ctrl('stop')" title="Arrêter définitivement" class="px-2 py-1 rounded bg-red-600/80 hover:bg-red-500 text-xs">⏹️</button>
             </div>
           </div>
         </div>
-        <div id="liveFeed" class="space-y-2 text-sm max-h-[55vh] overflow-y-auto">
+        <div id="liveFeed" class="liveFeed space-y-3 text-sm max-h-[58vh] overflow-y-auto pr-1">
           <p class="text-slate-500 text-sm">Sélectionne ou lance un débat pour voir les échanges en direct.</p>
         </div>
+        <p class="hidden md:block text-[10px] text-slate-600 mt-2">💡 Sélectionne un bout de texte dans un message pour l'épingler comme pépite.</p>
         <div id="humanBox" class="hidden mt-3 border-t border-slate-700 pt-3">
           <div class="flex gap-2">
             <select id="interveneKind" class="bg-slate-900 border border-slate-700 rounded p-2 text-xs">
@@ -175,7 +207,7 @@
   <section id="tab-pepites" class="hidden space-y-4">
     <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700 space-y-3">
       <h2 class="font-semibold">💎 Idées épinglées</h2>
-      <p class="text-xs text-slate-400">Les remarques marquées d'un ⭐ dans les débats. Clique « Débattre » pour lancer une session dédiée à cette idée.</p>
+      <p class="text-xs text-slate-400">Les passages marqués pendant les débats (⭐ un message entier, ou une phrase sélectionnée). Clique « Débattre » pour lancer une session dédiée à cette idée.</p>
       <div id="highlightList" class="space-y-2 text-sm"></div>
     </div>
     <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700 space-y-3">
@@ -184,7 +216,40 @@
       <div id="protocolList" class="space-y-2 text-sm"></div>
     </div>
   </section>
+
+  <!-- ===================== RÉGLAGES ===================== -->
+  <section id="tab-reglages" class="hidden space-y-4">
+    <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700 space-y-4 text-sm max-w-xl">
+      <div>
+        <h2 class="font-semibold">⚙️ Clés API</h2>
+        <p class="text-xs text-slate-400">Saisis tes clés ici (stockées dans le <code class="bg-slate-900 px-1 rounded">.env</code> du serveur, jamais réaffichées en clair). Laisse un champ vide pour conserver la clé existante.</p>
+      </div>
+      <div class="space-y-1">
+        <label class="text-xs text-slate-400">OpenRouter (praticiens) <span id="st_or" class="text-slate-500"></span></label>
+        <input id="key_or" type="password" placeholder="sk-or-…" class="w-full bg-slate-900 border border-slate-700 rounded p-2"/>
+      </div>
+      <div class="space-y-1">
+        <label class="text-xs text-slate-400">Anthropic / Claude (agents de processus) <span id="st_an" class="text-slate-500"></span></label>
+        <input id="key_an" type="password" placeholder="sk-ant-…" class="w-full bg-slate-900 border border-slate-700 rounded p-2"/>
+      </div>
+      <div class="space-y-1">
+        <label class="text-xs text-slate-400">Groq (vitesse + transcription) <span id="st_gq" class="text-slate-500"></span></label>
+        <input id="key_gq" type="password" placeholder="gsk_…" class="w-full bg-slate-900 border border-slate-700 rounded p-2"/>
+        <p class="text-[10px] text-slate-500">Crée-la sur console.groq.com/keys</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <button onclick="saveSettings()" class="bg-emerald-600 hover:bg-emerald-500 rounded px-4 py-2 text-sm font-medium">Enregistrer les clés</button>
+        <p id="settingsMsg" class="text-xs"></p>
+      </div>
+    </div>
+  </section>
 </div>
+
+<!-- Bouton flottant : épingler la sélection -->
+<button id="selSave" onclick="saveSelection()" class="hidden fixed z-50 bg-yellow-400 hover:bg-yellow-300 text-slate-900 text-xs font-semibold rounded-lg px-2.5 py-1 shadow-lg">💎 Épingler la sélection</button>
+
+<!-- Zone des toasts -->
+<div id="toasts" class="fixed bottom-4 right-4 z-50 space-y-2"></div>
 
 <!-- ===================== CALIBRATE MODAL ===================== -->
 <div id="calibrateModal" class="hidden fixed inset-0 bg-slate-950/80 z-40 flex items-center justify-center p-4">
@@ -201,7 +266,8 @@
 
 <script>
 const $ = (id) => document.getElementById(id);
-let ws = null, currentDebate = null, agentsCache = [];
+let ws = null, currentDebate = null, currentStatus = null, agentsCache = [];
+let turnsById = {}, renderedTurnIds = new Set();
 
 async function api(path, opts = {}) {
   opts.headers = Object.assign({ "Content-Type": "application/json" }, opts.headers || {});
@@ -210,6 +276,41 @@ async function api(path, opts = {}) {
   if (r.status === 401) { showLogin(); throw new Error("auth"); }
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.detail || r.statusText); }
   return r.headers.get("content-type")?.includes("json") ? r.json() : r.text();
+}
+
+// -------- Toasts --------
+function toast(msg, kind){
+  const t=document.createElement("div");
+  t.className="px-3 py-2 rounded-lg text-sm shadow-lg text-white "+(kind==="err"?"bg-red-600":kind==="warn"?"bg-amber-600":"bg-slate-700 border border-slate-600");
+  t.textContent=msg; $("toasts").appendChild(t);
+  setTimeout(()=>{ t.style.transition="opacity .4s"; t.style.opacity="0"; setTimeout(()=>t.remove(),400); }, 2600);
+}
+
+// -------- Markdown (rendu sûr : on échappe le HTML AVANT de mettre en forme) --------
+function escapeHtml(s){ return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function mdInline(s){
+  return s
+    .replace(/`([^`]+)`/g,'<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*\n]+)\*/g,'$1<em>$2</em>')
+    .replace(/(^|\s)_([^_\n]+)_/g,'$1<em>$2</em>');
+}
+function mdToHtml(src){
+  const lines = escapeHtml(src||"").split(/\r?\n/);
+  let html="", list=null;
+  const close=()=>{ if(list){ html+=`</${list}>`; list=null; } };
+  for(const raw of lines){
+    const line=raw.replace(/\s+$/,"");
+    if(!line.trim()){ close(); continue; }
+    let m;
+    if(/^(-{3,}|_{3,}|\*{3,})$/.test(line.trim())){ close(); html+="<hr/>"; continue; }
+    if(m=line.match(/^(#{1,5})\s+(.*)$/)){ close(); const lvl=Math.min(m[1].length+2,5); html+=`<h${lvl}>${mdInline(m[2])}</h${lvl}>`; continue; }
+    if(m=line.match(/^&gt;\s?(.*)$/)){ close(); html+=`<blockquote>${mdInline(m[1])}</blockquote>`; continue; }  /* le '>' a déjà été échappé en '&gt;' */
+    if(m=line.match(/^\s*[-*•]\s+(.*)$/)){ if(list!=="ul"){close(); html+="<ul>"; list="ul";} html+=`<li>${mdInline(m[1])}</li>`; continue; }
+    if(m=line.match(/^\s*\d+[.)]\s+(.*)$/)){ if(list!=="ol"){close(); html+="<ol>"; list="ol";} html+=`<li>${mdInline(m[1])}</li>`; continue; }
+    close(); html+=`<p>${mdInline(line)}</p>`;
+  }
+  close(); return html;
 }
 
 // -------- Auth --------
@@ -228,12 +329,13 @@ async function boot(){
 document.querySelectorAll(".tab-btn").forEach(b=>b.onclick=()=>{
   document.querySelectorAll(".tab-btn").forEach(x=>x.classList.remove("bg-slate-800"));
   b.classList.add("bg-slate-800");
-  ["debats","agents","sources","postulats","pepites"].forEach(t=>$("tab-"+t).classList.add("hidden"));
+  ["debats","agents","sources","postulats","pepites","reglages"].forEach(t=>$("tab-"+t).classList.add("hidden"));
   $("tab-"+b.dataset.tab).classList.remove("hidden");
   if(b.dataset.tab==="agents") loadAgents();
   if(b.dataset.tab==="sources") loadSources();
   if(b.dataset.tab==="postulats") loadPostulates();
   if(b.dataset.tab==="pepites") loadPepites();
+  if(b.dataset.tab==="reglages") loadSettings();
 });
 
 // -------- Init --------
@@ -250,17 +352,23 @@ async function init(){
 // -------- Débats --------
 async function loadDebates(){
   const list = await api("/api/debates");
-  $("debateList").innerHTML = list.map(d=>`
-    <div onclick="openDebate(${d.id})" class="cursor-pointer p-2 rounded-lg bg-slate-900 hover:bg-slate-700">
-      <div class="flex justify-between"><span class="font-medium">#${d.id}</span><span class="text-xs text-slate-500">${d.status}</span></div>
-      <p class="text-xs text-slate-400 truncate">${d.question}</p>
-    </div>`).join("") || '<p class="text-slate-500">Aucun débat.</p>';
+  $("debateList").innerHTML = list.map(d=>{
+    const dot = d.status==="en cours" ? '<span class="live-dot text-emerald-400">●</span>'
+      : d.status==="en pause" ? '<span class="text-amber-400">⏸</span>'
+      : '<span class="text-slate-600">●</span>';
+    const sel = d.id===currentDebate ? "ring-1 ring-emerald-500/60" : "";
+    return `<div onclick="openDebate(${d.id})" class="cursor-pointer p-2 rounded-lg bg-slate-900 hover:bg-slate-700 ${sel}">
+      <div class="flex justify-between items-center"><span class="font-medium">${dot} #${d.id}</span><span class="text-xs text-slate-500">${d.status}</span></div>
+      <p class="text-xs text-slate-400 truncate">${escapeHtml(d.question)}</p>
+    </div>`;
+  }).join("") || '<p class="text-slate-500">Aucun débat.</p>';
 }
 async function startDebate(){
   const q = $("debateQuestion").value.trim();
   if(!q) return;
   const r = await api("/api/debates",{method:"POST",body:JSON.stringify({question:q})});
   $("debateQuestion").value="";
+  toast("▶️ Débat #"+r.id+" lancé");
   await loadDebates(); openDebate(r.id);
 }
 async function openDebate(id){
@@ -270,31 +378,54 @@ async function openDebate(id){
   $("humanBox").classList.remove("hidden");
   $("liveId").textContent = id;
   $("liveQuestion").textContent = d.debate.question;
-  $("liveStatus").textContent = d.debate.status;
   $("liveRound").textContent = d.debate.round;
   $("liveFeed").innerHTML = "";
+  turnsById = {}; renderedTurnIds = new Set();
   $("consensusBadge").classList.add("hidden");
+  applyStatus(d.debate.status);
   d.turns.forEach(renderTurn);
   if(d.metrics && d.metrics.length) showConsensus(d.metrics[d.metrics.length-1]);
-  if(ws) ws.close();
+  connectWs(id);
+  loadDebates();
+}
+function connectWs(id){
+  if(ws){ try{ ws.onclose=null; ws.close(); }catch(e){} }
   const proto = location.protocol==="https:"?"wss":"ws";
   ws = new WebSocket(`${proto}://${location.host}/ws/debates/${id}`);
   ws.onmessage = (ev)=>handleWs(JSON.parse(ev.data));
+  ws.onclose = ()=>{ if(currentDebate===id){ setTimeout(()=>{ if(currentDebate===id) connectWs(id); }, 2500); } };
 }
 function handleWs(m){
   if(m.type==="turn") renderTurn(m);
-  else if(m.type==="status"){ $("liveStatus").textContent=m.status; loadDebates(); }
+  else if(m.type==="status"){ applyStatus(m.status); loadDebates(); }
   else if(m.type==="round_start"){ $("liveRound").textContent=m.round; }
   else if(m.type==="thinking") showThinking(m);
   else if(m.type==="calibration") renderNote(`🎛️ Calibrage (tour ${m.round}) : ${m.note}`);
   else if(m.type==="consensus") showConsensus(m);
   else if(m.type==="round_done") renderNote(`✅ Fin du tour ${m.round} — en pause. Teste dans le réel, puis « Relancer ».`);
 }
+function applyStatus(s){
+  currentStatus = s;
+  const map = {
+    "en cours":   ["EN DIRECT","bg-emerald-500/20 text-emerald-300",true],
+    "en pause":   ["EN PAUSE","bg-amber-500/20 text-amber-300",false],
+    "en calibrage":["CALIBRAGE","bg-cyan-500/20 text-cyan-300",false],
+    "terminé":    ["TERMINÉ","bg-slate-600/30 text-slate-400",false],
+  };
+  const [label,cls,live] = map[s] || ["—","bg-slate-600/30 text-slate-400",false];
+  const b=$("liveBadge");
+  b.className = "px-2 py-0.5 rounded-full text-[11px] font-semibold "+cls;
+  b.innerHTML = (live?'<span class="live-dot">●</span> ':'')+label;
+  const running = (s==="en cours");
+  $("btnPause").classList.toggle("hidden", !running);
+  $("btnResume").classList.toggle("hidden", running);
+  $("btnStop").classList.toggle("hidden", s==="terminé");
+}
 function showConsensus(m){
   const b=$("consensusBadge");
   if(m.consensus==null && !m.state){ b.classList.add("hidden"); return; }
   const danger = (m.state||"").includes("écho") || (m.state||"")==="blocage";
-  b.className = "ml-1 px-1.5 py-0.5 rounded text-[10px] " + (danger?"bg-red-900/60 text-red-300":"bg-emerald-900/60 text-emerald-300");
+  b.className = "px-1.5 py-0.5 rounded text-[10px] " + (danger?"bg-red-900/60 text-red-300":"bg-emerald-900/60 text-emerald-300");
   b.textContent = `consensus ${m.consensus??"?"}/100${m.state?" · "+m.state:""}`;
   b.classList.remove("hidden");
   renderNote(`📊 Consensus tour ${m.round} : ${m.consensus??"?"}/100${m.state?" ("+m.state+")":""}`);
@@ -302,45 +433,112 @@ function showConsensus(m){
 async function sendTestLog(){
   const text=$("testText").value.trim(); if(!text||!currentDebate) return;
   await api(`/api/debates/${currentDebate}/testlog`,{method:"POST",body:JSON.stringify({text,outcome:$("testOutcome").value})});
-  $("testText").value=""; $("testOutcome").value="";
+  $("testText").value=""; $("testOutcome").value=""; toast("📓 Test enregistré");
 }
 let thinkingEl=null;
+const PHASES = {
+  cadrage:["Cadrage","bg-slate-600/40 text-slate-300"],
+  position:["Position","bg-emerald-700/40 text-emerald-200"],
+  critique:["Critique","bg-amber-700/40 text-amber-200"],
+  convergence:["Convergence","bg-cyan-700/40 text-cyan-200"],
+  protocole:["Protocole","bg-purple-700/40 text-purple-200"],
+  "garde-fou":["Garde-fou","bg-red-700/40 text-red-200"],
+  synthese:["Synthèse","bg-teal-700/40 text-teal-200"],
+  humain:["Toi","bg-yellow-600/40 text-yellow-100"],
+};
 function showThinking(m){
   if(thinkingEl) thinkingEl.remove();
   thinkingEl=document.createElement("div");
-  thinkingEl.className="text-xs text-slate-500 italic";
-  thinkingEl.textContent=`${m.agent} réfléchit (${m.phase})…`;
+  thinkingEl.className="text-xs text-slate-400 italic flex items-center gap-1 px-1";
+  thinkingEl.innerHTML=`${escapeHtml(m.agent)} réfléchit (${m.phase}) <span class="think-dot">●</span><span class="think-dot">●</span><span class="think-dot">●</span>`;
   $("liveFeed").appendChild(thinkingEl); scrollFeed();
 }
 function renderTurn(t){
   if(thinkingEl){ thinkingEl.remove(); thinkingEl=null; }
+  if(t.id!=null){ if(renderedTurnIds.has(t.id)) return; renderedTurnIds.add(t.id); turnsById[t.id]=t; }
+  const [plabel,pcls] = PHASES[t.phase] || [t.phase, "bg-slate-700/40 text-slate-300"];
+  const isErr = (t.content||"").includes("⚠️ Modèle indisponible");
   const el=document.createElement("div");
-  el.className=`bg-slate-900 rounded-lg p-3 border-l-4 phase-${t.phase}`;
+  el.className=`turn-block bg-slate-900 rounded-lg p-3 border-l-4 phase-${t.phase} ${isErr?'opacity-70':''}`;
+  el.dataset.turnId = t.id ?? "";
+  el.dataset.debateId = t.debate_id ?? (currentDebate||"");
+  el.dataset.agent = t.agent_name || "";
   const star = t.phase==="humain" ? "" :
-    `<button title="Épingler comme pépite" onclick='highlightTurn(${JSON.stringify(t).replace(/'/g,"&#39;")})' class="text-xs text-slate-500 hover:text-yellow-400">⭐</button>`;
-  el.innerHTML=`<div class="flex justify-between mb-1 items-center"><span class="font-medium">${t.agent_name}</span>
-    <span class="flex items-center gap-2"><span class="text-xs text-slate-500 uppercase">${t.phase}</span>${star}</span></div>
-    <div class="turn-content text-slate-300 text-sm">${escapeHtml(t.content)}</div>`;
+    `<button title="Épingler tout le message" onclick="pinTurn(${t.id})" class="text-xs text-slate-500 hover:text-yellow-400">⭐</button>`;
+  const body = isErr
+    ? `<div class="text-xs text-red-300/80 italic">⚠️ Modèle momentanément indisponible (quota). L'agent reprendra au prochain tour.</div>`
+    : `<div class="md">${mdToHtml(t.content)}</div>`;
+  el.innerHTML=`<div class="flex justify-between mb-1.5 items-center gap-2">
+      <span class="font-semibold text-slate-100">${escapeHtml(t.agent_name)}</span>
+      <span class="flex items-center gap-2">
+        <span class="text-[10px] px-1.5 py-0.5 rounded ${pcls}">${plabel}</span>${star}
+      </span></div>${body}`;
   $("liveFeed").appendChild(el); scrollFeed();
 }
-async function highlightTurn(t){
+async function pinTurn(id){
+  const t = turnsById[id]; if(!t) return;
   await api("/api/highlights",{method:"POST",body:JSON.stringify({text:t.content,debate_id:t.debate_id,turn_id:t.id,note:t.agent_name})});
-  renderNote("⭐ Épinglé dans les Pépites.");
+  toast("⭐ Message épinglé dans les Pépites");
 }
 async function sendIntervene(){
   const text=$("interveneText").value.trim(); if(!text||!currentDebate) return;
   await api(`/api/debates/${currentDebate}/intervene`,{method:"POST",body:JSON.stringify({text,kind:$("interveneKind").value})});
-  $("interveneText").value="";
+  $("interveneText").value=""; toast("🫀 Intervention transmise");
 }
 function renderNote(txt){
   const el=document.createElement("div");
-  el.className="text-center text-xs text-cyan-400 py-2";
+  el.className="text-center text-xs text-cyan-400 py-1.5";
   el.textContent=txt; $("liveFeed").appendChild(el); scrollFeed();
 }
 function scrollFeed(){ const f=$("liveFeed"); f.scrollTop=f.scrollHeight; }
+
 async function ctrl(action){
   if(!currentDebate) return;
-  await api(`/api/debates/${currentDebate}/${action}`,{method:"POST"});
+  try{
+    const r=await api(`/api/debates/${currentDebate}/${action}`,{method:"POST"});
+    if(r && r.ok===false){
+      toast("Action impossible sur ce débat.","warn");
+      return;
+    }
+    if(action==="pause") toast("⏸️ Pause demandée (à la fin de la prise de parole en cours)");
+    if(action==="resume"){ toast("▶️ Reprise…"); connectWs(currentDebate); }
+    if(action==="stop") toast("⏹️ Arrêt du débat");
+    const d=await api("/api/debates/"+currentDebate); applyStatus(d.debate.status); loadDebates();
+  }catch(e){ toast("Erreur : "+e.message,"err"); }
+}
+
+// -------- Sélection → épingler une phrase --------
+let selData=null;
+document.addEventListener("mouseup",(e)=>{
+  if(e.target && e.target.id==="selSave") return;
+  const sel=window.getSelection();
+  const txt=(sel?sel.toString():"").trim();
+  const btn=$("selSave");
+  if(txt.length>3 && sel.rangeCount){
+    let node=sel.anchorNode; while(node && node.nodeType!==1) node=node.parentNode;
+    const block=node?node.closest(".turn-block"):null;
+    if(block){
+      selData={text:txt, turn_id:block.dataset.turnId||null, debate_id:block.dataset.debateId||currentDebate, note:block.dataset.agent||""};
+      const r=sel.getRangeAt(0).getBoundingClientRect();
+      btn.style.top=Math.max(8,r.top-34)+"px";
+      btn.style.left=Math.min(window.innerWidth-180,r.left)+"px";
+      btn.classList.remove("hidden");
+      return;
+    }
+  }
+  btn.classList.add("hidden");
+});
+async function saveSelection(){
+  if(!selData) return;
+  await api("/api/highlights",{method:"POST",body:JSON.stringify({
+    text:selData.text,
+    debate_id:Number(selData.debate_id)||currentDebate,
+    turn_id:selData.turn_id?Number(selData.turn_id):null,
+    note:selData.note
+  })});
+  $("selSave").classList.add("hidden");
+  window.getSelection().removeAllRanges();
+  toast("💎 Phrase épinglée dans les Pépites");
 }
 
 // -------- Calibrage --------
@@ -348,7 +546,7 @@ function openCalibrate(){ ctrl("pause"); $("calibrateModal").classList.remove("h
 function closeCalibrate(){ $("calibrateModal").classList.add("hidden"); }
 async function saveCalibrate(){
   await api(`/api/debates/${currentDebate}/calibrate`,{method:"POST",body:JSON.stringify({note:$("calibNote").value})});
-  $("calibNote").value=""; closeCalibrate();
+  $("calibNote").value=""; closeCalibrate(); toast("🎛️ Calibrage enregistré");
 }
 
 // -------- Agents --------
@@ -358,12 +556,12 @@ async function loadAgents(){
   $("agentList").innerHTML = agentsCache.map(a=>`
     <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700 space-y-2 text-sm">
       <div class="flex justify-between items-center">
-        <span class="font-semibold">${a.icon} ${a.name}</span>
+        <span class="font-semibold">${a.icon} ${escapeHtml(a.name)}</span>
         <span class="text-xs px-2 py-0.5 rounded ${a.role==='praticien'?'bg-emerald-900/50 text-emerald-300':'bg-purple-900/50 text-purple-300'}">${a.role}</span>
       </div>
-      <p class="text-xs text-slate-400">${a.domain||""}</p>
+      <p class="text-xs text-slate-400">${escapeHtml(a.domain||"")}</p>
       <label class="text-xs text-slate-500">Modèle (${a.provider})</label>
-      <input value="${a.model}" onchange="saveLever('${a.id}','model',this.value)" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs"/>
+      <input value="${escapeHtml(a.model)}" onchange="saveLever('${a.id}','model',this.value)" class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-xs"/>
       <label class="text-xs text-slate-500">Température : <span id="t-${a.id}">${a.temperature}</span></label>
       <input type="range" min="0" max="1.5" step="0.05" value="${a.temperature}" oninput="$('t-${a.id}').textContent=this.value" onchange="saveLever('${a.id}','temperature',parseFloat(this.value))" class="w-full accent-emerald-500"/>
       <details class="text-xs"><summary class="cursor-pointer text-slate-500">Persona</summary>
@@ -378,6 +576,7 @@ async function loadAgents(){
 async function saveLever(id,key,val){
   const o={}; o[key]=val;
   await api("/api/agents/"+id,{method:"PUT",body:JSON.stringify(o)});
+  toast("Réglage enregistré : "+key);
 }
 function toggleNewAgent(){ $("newAgentForm").classList.toggle("hidden"); }
 async function createAgent(){
@@ -385,14 +584,14 @@ async function createAgent(){
     provider:$("na_provider").value,domain:$("na_domain").value,persona:$("na_persona").value,
     orientation:$("na_orientation").value};
   if(!body.name) return;
-  try{ await api("/api/agents",{method:"POST",body:JSON.stringify(body)}); toggleNewAgent(); loadAgents(); }
+  try{ await api("/api/agents",{method:"POST",body:JSON.stringify(body)}); toggleNewAgent(); loadAgents(); toast("Agent créé"); }
   catch(e){ alert(e.message); }
 }
-async function delAgent(id){ if(confirm("Supprimer cet agent ?")){ await api("/api/agents/"+id,{method:"DELETE"}); loadAgents(); } }
+async function delAgent(id){ if(confirm("Supprimer cet agent ?")){ await api("/api/agents/"+id,{method:"DELETE"}); loadAgents(); toast("Agent supprimé"); } }
 
 // -------- Sources --------
 function fillAgentSelect(){
-  const opts = agentsCache.filter(a=>a.role==="praticien").map(a=>`<option value="${a.id}">${a.icon} ${a.name}</option>`).join("");
+  const opts = agentsCache.filter(a=>a.role==="praticien").map(a=>`<option value="${a.id}">${a.icon} ${escapeHtml(a.name)}</option>`).join("");
   if($("srcAgent")) $("srcAgent").innerHTML = opts;
 }
 async function loadSources(){
@@ -450,18 +649,18 @@ async function loadPepites(){
   $("highlightList").innerHTML = o.highlights.map(h=>`
     <div class="bg-slate-900 rounded-lg p-3 border-l-4 border-yellow-500">
       <div class="flex justify-between items-start gap-2">
-        <div class="turn-content text-slate-300 flex-1">${escapeHtml(h.text)}</div>
+        <div class="md flex-1">${mdToHtml(h.text)}</div>
         <div class="flex flex-col gap-1 shrink-0">
           <button onclick='debateIdea(${JSON.stringify(h.text)})' class="text-xs bg-emerald-700/60 hover:bg-emerald-600 rounded px-2 py-1">Débattre</button>
           <button onclick="delHighlight(${h.id})" class="text-xs text-red-400 hover:text-red-300">Retirer</button>
         </div>
       </div>
       ${h.note?`<p class="text-[10px] text-slate-500 mt-1">via ${escapeHtml(h.note)}</p>`:""}
-    </div>`).join("") || '<p class="text-slate-500 text-sm">Aucune pépite. Épingle des remarques avec ⭐ pendant un débat.</p>';
+    </div>`).join("") || '<p class="text-slate-500 text-sm">Aucune pépite. Épingle un message (⭐) ou sélectionne une phrase pendant un débat.</p>';
   $("protocolList").innerHTML = o.protocols.map(p=>`
     <details class="bg-slate-900 rounded-lg p-3 border-l-4 border-purple-500">
       <summary class="cursor-pointer text-slate-300">🧪 Débat #${p.debate_id} · tour ${p.round} <span class="text-slate-500">— ${escapeHtml((p.debate_question||"").slice(0,60))}</span></summary>
-      <div class="turn-content text-slate-300 text-sm mt-2">${escapeHtml(p.content)}</div>
+      <div class="md mt-2">${mdToHtml(p.content)}</div>
     </details>`).join("") || '<p class="text-slate-500 text-sm">Aucune Fiche Protocole produite pour l\'instant.</p>';
 }
 async function delHighlight(id){ await api("/api/highlights/"+id,{method:"DELETE"}); loadPepites(); }
@@ -472,7 +671,31 @@ async function debateIdea(text){
   await loadDebates(); openDebate(r.id);
 }
 
-function escapeHtml(s){ return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+// -------- Réglages (clés API) --------
+async function loadSettings(){
+  const s = await api("/api/settings");
+  const fmt = (o)=> o.set ? `· ✅ configurée (${o.hint})` : "· ⚠️ manquante";
+  $("st_or").textContent = fmt(s.OPENROUTER_API_KEY);
+  $("st_an").textContent = fmt(s.ANTHROPIC_API_KEY);
+  $("st_gq").textContent = fmt(s.GROQ_API_KEY);
+  $("key_or").value=""; $("key_an").value=""; $("key_gq").value="";
+}
+async function saveSettings(){
+  const body={
+    OPENROUTER_API_KEY:$("key_or").value.trim(),
+    ANTHROPIC_API_KEY:$("key_an").value.trim(),
+    GROQ_API_KEY:$("key_gq").value.trim()
+  };
+  if(!body.OPENROUTER_API_KEY && !body.ANTHROPIC_API_KEY && !body.GROQ_API_KEY){
+    $("settingsMsg").textContent="Rien à enregistrer (tous les champs sont vides)."; $("settingsMsg").className="text-xs text-amber-400"; return;
+  }
+  $("settingsMsg").textContent="Enregistrement…"; $("settingsMsg").className="text-xs text-amber-400";
+  try{
+    await api("/api/settings",{method:"POST",body:JSON.stringify(body)});
+    $("settingsMsg").textContent="✅ Clés enregistrées (prises en compte immédiatement)."; $("settingsMsg").className="text-xs text-emerald-400";
+    toast("⚙️ Clés enregistrées"); loadSettings(); init();
+  }catch(e){ $("settingsMsg").textContent="❌ "+e.message; $("settingsMsg").className="text-xs text-red-400"; }
+}
 
 boot();
 </script>
