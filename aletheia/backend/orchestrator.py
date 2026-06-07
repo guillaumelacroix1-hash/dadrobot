@@ -167,6 +167,14 @@ class DebateRuntime:
         if agent.orientation:
             system += ("\n\nORIENTATION PARTICULIÈRE (consigne de l'humain, propre à toi, "
                        f"à suivre dans tes interventions) :\n{agent.orientation}")
+        if agent.role == "praticien":
+            system += (
+                "\n\nPOSTURE DE TRAVAIL : ce cénacle GÉNÈRE des hypothèses concrètes et "
+                "testables. Explore l'idée à fond, sans réflexe de débunkage ni disclaimers "
+                "à répétition. Reste intellectuellement honnête : distingue clairement ce qui "
+                "est établi de ce qui est spéculatif, mais propose des pistes même non prouvées "
+                "— l'absence de preuve publique ne vaut pas preuve du contraire. Sois à la fois "
+                "audacieux et rigoureux.")
         try:
             content = await llm.chat(agent.provider, agent.model, system, user,
                                      agent.temperature, agent.top_p)
