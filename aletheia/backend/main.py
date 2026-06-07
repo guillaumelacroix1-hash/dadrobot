@@ -288,6 +288,7 @@ class HighlightIn(BaseModel):
     debate_id: int | None = None
     turn_id: int | None = None
     note: str = ""
+    status: str = "epinglee"
 
 
 @app.get("/api/highlights", dependencies=[Depends(auth.require_auth)])
@@ -297,13 +298,23 @@ def get_highlights():
 
 @app.post("/api/highlights", dependencies=[Depends(auth.require_auth)])
 def create_highlight(body: HighlightIn):
-    hid = db.add_highlight(body.text, body.debate_id, body.turn_id, body.note)
+    hid = db.add_highlight(body.text, body.debate_id, body.turn_id, body.note, body.status)
     return {"id": hid}
 
 
 @app.delete("/api/highlights/{hid}", dependencies=[Depends(auth.require_auth)])
 def remove_highlight(hid: int):
     db.delete_highlight(hid)
+    return {"ok": True}
+
+
+class HighlightStatusIn(BaseModel):
+    status: str   # epinglee | candidate | confirmee | ecartee
+
+
+@app.post("/api/highlights/{hid}/status", dependencies=[Depends(auth.require_auth)])
+def update_highlight_status(hid: int, body: HighlightStatusIn):
+    db.set_highlight_status(hid, body.status)
     return {"ok": True}
 
 

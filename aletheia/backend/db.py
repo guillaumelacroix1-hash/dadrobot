@@ -108,6 +108,11 @@ def init_db() -> None:
             );
             """
         )
+        # Migration douce : statut des pépites (pour les bases déjà créées sans).
+        cols = [r["name"] for r in c.execute("PRAGMA table_info(highlights)").fetchall()]
+        if "status" not in cols:
+            c.execute("ALTER TABLE highlights ADD COLUMN status TEXT NOT NULL "
+                      "DEFAULT 'epinglee'")  # epinglee / candidate / confirmee / ecartee
 
 
 # --------------------------------------------------------------------- débats
@@ -276,12 +281,13 @@ def list_sources(agent_id: str | None = None) -> list[dict[str, Any]]:
 
 # ------------------------------------------------------------------- pépites
 def add_highlight(text: str, debate_id: int | None = None,
-                  turn_id: int | None = None, note: str = "") -> int:
+                  turn_id: int | None = None, note: str = "",
+                  status: str = "epinglee") -> int:
     with _conn() as c:
         cur = c.execute(
-            "INSERT INTO highlights (debate_id, turn_id, text, note, created_at) "
-            "VALUES (?,?,?,?,?)",
-            (debate_id, turn_id, text, note, now()),
+            "INSERT INTO highlights (debate_id, turn_id, text, note, status, created_at) "
+            "VALUES (?,?,?,?,?,?)",
+            (debate_id, turn_id, text, note, status, now()),
         )
         return int(cur.lastrowid)
 
@@ -295,6 +301,11 @@ def list_highlights() -> list[dict[str, Any]]:
 def delete_highlight(highlight_id: int) -> None:
     with _conn() as c:
         c.execute("DELETE FROM highlights WHERE id=?", (highlight_id,))
+
+
+def set_highlight_status(highlight_id: int, status: str) -> None:
+    with _conn() as c:
+        c.execute("UPDATE highlights SET status=? WHERE id=?", (status, highlight_id))
 
 
 def list_protocols() -> list[dict[str, Any]]:

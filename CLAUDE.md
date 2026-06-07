@@ -18,8 +18,13 @@
   via `config.set_keys`).
 - **Reprise de débat** réparée : « Relancer » recrée le moteur après Stop/redémarrage
   (`DebateManager.resume` async — `orchestrator.py` + route `/resume`).
-- **À discuter / en cours** : critères d'apparition des **pépites** (manuel vs « candidates »
-  proposées par les agents, à valider) ; activer **Groq** (clé à saisir dans ⚙️ Réglages).
+- **Pépites** : cycle de vie implémenté — manuel (⭐ / sélection de phrase) **+** « candidates »
+  proposées par le Modérateur à la convergence ; statuts candidate → retenue → confirmée (par
+  test réel), boutons Retenir/Écarter/Confirmée (`db.set_highlight_status`,
+  `POST /api/highlights/{id}/status`).
+- **Praticiens sur Groq** : `use_groq.py` réassigne les 12 praticiens en `provider: groq` +
+  modèles Groq variés (gratuit/rapide, plus stable que les `:free` OpenRouter saturés en amont).
+  ⚠️ Les appels Groq exigent un **User-Agent** explicite (sinon 403 edge) — géré dans `llm.py`.
 
 ## 1. Vision du porteur (cadre de travail — à respecter)
 

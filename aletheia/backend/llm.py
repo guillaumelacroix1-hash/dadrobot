@@ -92,7 +92,10 @@ async def _openai_compat(
 ) -> str:
     if not api_key:
         raise LLMError(f"clé API manquante pour {url.split('/')[2]}")
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    # User-Agent explicite : l'edge de Groq renvoie 403 sur le UA par défaut des
+    # clients Python (urllib/httpx). Sans rapport pour OpenRouter, mais inoffensif.
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
+               "User-Agent": "Mozilla/5.0 (compatible; Aletheia/1.0)"}
     if extra_headers:
         headers.update(extra_headers)
     payload = {

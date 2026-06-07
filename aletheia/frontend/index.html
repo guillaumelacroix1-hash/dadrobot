@@ -403,6 +403,7 @@ function handleWs(m){
   else if(m.type==="calibration") renderNote(`🎛️ Calibrage (tour ${m.round}) : ${m.note}`);
   else if(m.type==="consensus") showConsensus(m);
   else if(m.type==="round_done") renderNote(`✅ Fin du tour ${m.round} — en pause. Teste dans le réel, puis « Relancer ».`);
+  else if(m.type==="nugget"){ renderNote(`💡 Pépite candidate proposée : ${m.text}`); toast("💎 Pépite candidate — voir l'onglet Pépites"); }
 }
 function applyStatus(s){
   currentStatus = s;
@@ -644,24 +645,53 @@ async function editPostulate(id,text){ await api("/api/postulates/"+id,{method:"
 async function togglePostulate(id,active){ await api("/api/postulates/"+id,{method:"PUT",body:JSON.stringify({active})}); loadPostulates(); }
 
 // -------- Pépites / sorties --------
+const PEPITE_META = {
+  candidate:["💡 Candidate","bg-amber-500/20 text-amber-300","border-amber-500"],
+  epinglee: ["📌 Retenue","bg-yellow-500/20 text-yellow-200","border-yellow-500"],
+  confirmee:["✅ Confirmée","bg-emerald-500/20 text-emerald-300","border-emerald-500"],
+};
+const PEPITE_ORDER = {candidate:0, epinglee:1, confirmee:2};
 async function loadPepites(){
   const o = await api("/api/outputs");
-  $("highlightList").innerHTML = o.highlights.map(h=>`
-    <div class="bg-slate-900 rounded-lg p-3 border-l-4 border-yellow-500">
+  const visible = o.highlights
+    .map(h=>({...h, status:h.status||"epinglee"}))
+    .filter(h=>h.status!=="ecartee")
+    .sort((a,b)=>(PEPITE_ORDER[a.status]??5)-(PEPITE_ORDER[b.status]??5));
+  $("highlightList").innerHTML = visible.map(h=>{
+    const [lbl,cls,brd] = PEPITE_META[h.status] || PEPITE_META.epinglee;
+    let actions="";
+    if(h.status==="candidate"){
+      actions=`<button onclick="setPepite(${h.id},'epinglee')" class="text-xs bg-yellow-700/60 hover:bg-yellow-600 rounded px-2 py-1">Retenir</button>
+        <button onclick="setPepite(${h.id},'ecartee')" class="text-xs text-slate-400 hover:text-red-300">Écarter</button>`;
+    } else if(h.status==="confirmee"){
+      actions=`<button onclick='debateIdea(${JSON.stringify(h.text)})' class="text-xs bg-emerald-700/60 hover:bg-emerald-600 rounded px-2 py-1">Débattre</button>
+        <button onclick="delHighlight(${h.id})" class="text-xs text-red-400 hover:text-red-300">Retirer</button>`;
+    } else {
+      actions=`<button onclick="setPepite(${h.id},'confirmee')" title="J'ai testé, ça marche" class="text-xs bg-emerald-800/70 hover:bg-emerald-700 rounded px-2 py-1">✅ Confirmée</button>
+        <button onclick='debateIdea(${JSON.stringify(h.text)})' class="text-xs bg-emerald-700/60 hover:bg-emerald-600 rounded px-2 py-1">Débattre</button>
+        <button onclick="delHighlight(${h.id})" class="text-xs text-red-400 hover:text-red-300">Retirer</button>`;
+    }
+    return `<div class="bg-slate-900 rounded-lg p-3 border-l-4 ${brd}">
       <div class="flex justify-between items-start gap-2">
-        <div class="md flex-1">${mdToHtml(h.text)}</div>
-        <div class="flex flex-col gap-1 shrink-0">
-          <button onclick='debateIdea(${JSON.stringify(h.text)})' class="text-xs bg-emerald-700/60 hover:bg-emerald-600 rounded px-2 py-1">Débattre</button>
-          <button onclick="delHighlight(${h.id})" class="text-xs text-red-400 hover:text-red-300">Retirer</button>
+        <div class="flex-1 min-w-0">
+          <span class="text-[10px] px-1.5 py-0.5 rounded ${cls}">${lbl}</span>
+          <div class="md mt-1">${mdToHtml(h.text)}</div>
         </div>
+        <div class="flex flex-col gap-1 shrink-0">${actions}</div>
       </div>
       ${h.note?`<p class="text-[10px] text-slate-500 mt-1">via ${escapeHtml(h.note)}</p>`:""}
-    </div>`).join("") || '<p class="text-slate-500 text-sm">Aucune pépite. Épingle un message (⭐) ou sélectionne une phrase pendant un débat.</p>';
+    </div>`;
+  }).join("") || '<p class="text-slate-500 text-sm">Aucune pépite. Épingle un message (⭐), sélectionne une phrase, ou laisse le Modérateur proposer des candidates à la convergence.</p>';
   $("protocolList").innerHTML = o.protocols.map(p=>`
     <details class="bg-slate-900 rounded-lg p-3 border-l-4 border-purple-500">
       <summary class="cursor-pointer text-slate-300">🧪 Débat #${p.debate_id} · tour ${p.round} <span class="text-slate-500">— ${escapeHtml((p.debate_question||"").slice(0,60))}</span></summary>
       <div class="md mt-2">${mdToHtml(p.content)}</div>
     </details>`).join("") || '<p class="text-slate-500 text-sm">Aucune Fiche Protocole produite pour l\'instant.</p>';
+}
+async function setPepite(id,status){
+  await api(`/api/highlights/${id}/status`,{method:"POST",body:JSON.stringify({status})});
+  toast(status==="confirmee"?"✅ Pépite confirmée":status==="ecartee"?"Pépite écartée":status==="epinglee"?"📌 Pépite retenue":"Statut mis à jour");
+  loadPepites();
 }
 async function delHighlight(id){ await api("/api/highlights/"+id,{method:"DELETE"}); loadPepites(); }
 async function debateIdea(text){

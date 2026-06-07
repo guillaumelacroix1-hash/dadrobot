@@ -47,6 +47,17 @@ def parse_consensus(text: str) -> tuple[int | None, str]:
             break
     return score, state
 
+
+def parse_nuggets(text: str) -> list[str]:
+    """Lit les lignes 'PÉPITE CANDIDATE : …' proposées à la convergence."""
+    out = []
+    for m in re.finditer(r"P[ÉE]PITE\s+CANDIDATE\s*[:=]\s*(.+)", text or "", re.IGNORECASE):
+        s = m.group(1).strip(" *-—:").strip()
+        if s:
+            out.append(s)
+    return out[:3]
+
+
 FICHE_INSTRUCTION = (
     "Transforme la meilleure piste en FICHE PROTOCOLE testable, avec ces sections : "
     "Nom · Objectif visé · Matériel · Durée · Déroulé pas-à-pas · "
@@ -207,7 +218,12 @@ class DebateRuntime:
                         mod, rnd, "convergence",
                         "Extrais les 2-3 pistes les plus prometteuses du tour "
                         "(numérote-les). Ajoute une ligne RAPPORT MINORITAIRE (avis "
-                        "dissidents à garder). Termine par une ligne "
+                        "dissidents à garder). Si une piste est VRAIMENT prometteuse "
+                        "(testable concrètement avec un signe observable, nouvelle, et "
+                        "soutenue par plusieurs spécialités OU née d'une tension féconde), "
+                        "signale-la sur sa propre ligne « PÉPITE CANDIDATE : <une phrase "
+                        "claire> » (0 à 2 maximum, seulement si ça le mérite vraiment). "
+                        "Termine par une ligne "
                         "« CONSENSUS : NN/100 (état: convergence | blocage | chambre "
                         "d'écho) » évaluant honnêtement où en est le cercle.",
                         use_rag=False)
@@ -216,6 +232,10 @@ class DebateRuntime:
                         db.add_metric(self.debate_id, rnd, score, state)
                         await self.emit({"type": "consensus", "round": rnd,
                                          "consensus": score, "state": state})
+                        for txt in parse_nuggets(conv["content"]):
+                            db.add_highlight(txt, self.debate_id, conv["id"],
+                                             note="Modérateur · candidate", status="candidate")
+                            await self.emit({"type": "nugget", "text": txt})
                 if exp:
                     await self._speak(exp, rnd, "protocole", FICHE_INSTRUCTION,
                                       use_rag=False)
