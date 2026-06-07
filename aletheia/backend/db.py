@@ -79,6 +79,15 @@ def init_db() -> None:
                 chunks INTEGER NOT NULL DEFAULT 0,
                 created_at REAL NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS highlights (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                debate_id INTEGER,
+                turn_id INTEGER,
+                text TEXT NOT NULL,
+                note TEXT,
+                created_at REAL NOT NULL
+            );
             """
         )
 
@@ -244,4 +253,38 @@ def list_sources(agent_id: str | None = None) -> list[dict[str, Any]]:
             ).fetchall()
         else:
             rows = c.execute("SELECT * FROM sources ORDER BY created_at DESC").fetchall()
+        return [dict(r) for r in rows]
+
+
+# ------------------------------------------------------------------- pépites
+def add_highlight(text: str, debate_id: int | None = None,
+                  turn_id: int | None = None, note: str = "") -> int:
+    with _conn() as c:
+        cur = c.execute(
+            "INSERT INTO highlights (debate_id, turn_id, text, note, created_at) "
+            "VALUES (?,?,?,?,?)",
+            (debate_id, turn_id, text, note, now()),
+        )
+        return int(cur.lastrowid)
+
+
+def list_highlights() -> list[dict[str, Any]]:
+    with _conn() as c:
+        rows = c.execute("SELECT * FROM highlights ORDER BY created_at DESC").fetchall()
+        return [dict(r) for r in rows]
+
+
+def delete_highlight(highlight_id: int) -> None:
+    with _conn() as c:
+        c.execute("DELETE FROM highlights WHERE id=?", (highlight_id,))
+
+
+def list_protocols() -> list[dict[str, Any]]:
+    """Toutes les Fiches Protocole produites (sorties concrètes des débats)."""
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT t.*, d.question AS debate_question FROM turns t "
+            "JOIN debates d ON d.id = t.debate_id "
+            "WHERE t.phase='protocole' ORDER BY t.created_at DESC"
+        ).fetchall()
         return [dict(r) for r in rows]

@@ -105,9 +105,16 @@ class DebateRuntime:
         if use_rag and agent.role == "praticien":
             rag_ctx = rag.context_for(agent.id, self.question)
             if rag_ctx:
-                user += f"\n\nEXTRAITS DE TES SOURCES (cite-les si utile) :\n{rag_ctx}"
+                user += (f"\n\nEXTRAITS DE TES SOURCES (en complément de tes "
+                         f"connaissances, cite-les si utile) :\n{rag_ctx}")
+            else:
+                user += ("\n\n(Aucune source déposée pour l'instant : appuie-toi sur "
+                         "tes propres connaissances de ta spécialité.)")
         user += f"\n\nCONSIGNE : {instruction}"
         system = agent.persona or f"Tu es {agent.name}, spécialiste de {agent.domain}."
+        if agent.orientation:
+            system += ("\n\nORIENTATION PARTICULIÈRE (consigne de l'humain, propre à toi, "
+                       f"à suivre dans tes interventions) :\n{agent.orientation}")
         try:
             content = await llm.chat(agent.provider, agent.model, system, user,
                                      agent.temperature, agent.top_p)
@@ -141,11 +148,16 @@ class DebateRuntime:
                 for a in prats:
                     await self._speak(a, rnd, "critique",
                                       "Réagis aux positions des autres : 2 accords, "
-                                      "2 tensions, 1 angle mort. Concis.")
+                                      "2 tensions, 1 angle mort. NE te rallie PAS à la "
+                                      "majorité par confort : si tu n'es pas convaincu, "
+                                      "dis-le et défends ta position de minorité. Concis.")
                 if mod:
                     await self._speak(mod, rnd, "convergence",
                                       "Extrais les 2-3 pistes les plus prometteuses du "
-                                      "tour. Numérote-les.", use_rag=False)
+                                      "tour (numérote-les). Ajoute une ligne RAPPORT "
+                                      "MINORITAIRE : les avis dissidents qui méritent "
+                                      "d'être gardés, même s'ils ne font pas consensus.",
+                                      use_rag=False)
                 if exp:
                     await self._speak(exp, rnd, "protocole", FICHE_INSTRUCTION,
                                       use_rag=False)
@@ -210,6 +222,19 @@ class DebateManager:
         rt = self.get(debate_id)
         if rt:
             await rt.emit({"type": "calibration", "round": rnd, "note": note})
+
+    async def intervene(self, debate_id: int, text: str, kind: str = "ressenti") -> dict:
+        """Humain dans la boucle : injecte un message qui sera vu par les agents
+        au tour suivant (le contexte est relu depuis la base)."""
+        rnd = (db.get_debate(debate_id) or {}).get("round", 0)
+        label = {"ressenti": "🧑 Humain (ressenti)",
+                 "orientation": "🧑 Humain (orientation)",
+                 "source": "🧑 Humain (apport)"}.get(kind, "🧑 Humain")
+        turn = db.add_turn(debate_id, rnd, "humain", "humain", label, text)
+        rt = self.get(debate_id)
+        if rt:
+            await rt.emit({"type": "turn", **turn})
+        return turn
 
 
 manager = DebateManager()

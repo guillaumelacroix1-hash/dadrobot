@@ -289,3 +289,48 @@ Chaque fichier `agents/*.yaml` expose les réglages modifiables :
 > **Prochaines étapes** : renseigner les clés API et lancer une première vraie session
 > (étape 8), puis déployer sur Render. Améliorations prévues : reprise d'un débat après
 > redémarrage du serveur, transcription audio/vidéo testée de bout en bout.
+
+---
+
+## 9. Inspirations & leçons de l'état de l'art (recherche)
+
+Le débat multi-agents entre LLM est un champ actif. Ce qu'on en retient et applique :
+
+**Projets / frameworks de référence**
+- **karpathy/llm-council** — un « conseil » de modèles via OpenRouter : réponses en
+  parallèle, **évaluation croisée anonymisée**, puis un **Chairman** synthétise. (Notre
+  Modérateur joue ce rôle ; OpenRouter est notre passerelle.)
+- **geek-alt/LLM-Council** — délibération locale avec **rapports minoritaires**,
+  **score de consensus** et **rejeu de session**. (On a repris les rapports minoritaires.)
+- **AutoGen** (Microsoft) — un **GroupChatManager** décide *qui parle ensuite* (tour de
+  parole dynamique plutôt que figé). → amélioration future pour notre Modérateur.
+- **CAMEL** — jeu de rôle par *inception prompting* ; rôles spécialisés stables.
+- **AgentVerse / Society of Mind** — l'intelligence émerge d'agents partiels en interaction.
+
+**Papiers — le piège central : la « tyrannie de la majorité »**
+- Sans **diversité**, un débat d'agents homogènes ne dépasse pas le vote majoritaire et
+  peut se figer sur une mauvaise réponse précoce (effet chambre d'écho / conformité).
+- Mitigations adoptées : **hétérogénéité des modèles** (chaque praticien tourne sur un
+  modèle différent), **prompts anti-conformité**, **rapport minoritaire**, **Avocat du
+  diable**, et l'**humain dans la boucle** comme source externe.
+- À noter : l'**anonymisation** des juges est utile pour un conseil homogène ; chez nous
+  les identités *comptent* (on veut l'avis de l'Hypnose en tant que tel), donc on mise
+  surtout sur la diversité + l'anti-conformité.
+
+## 10. Capacités ajoutées suite à la recherche
+
+- **Connaissances internet par défaut** : un praticien débat à partir de ses propres
+  connaissances de sa spécialité ; les sources RAG, quand elles existent, viennent en
+  complément. On peut donc démarrer **sans aucune source** et alimenter plus tard.
+- **Orientation par agent** : en plus des postulats globaux, chaque agent a un champ
+  *orientation* éditable pour l'**orienter (ou le désorienter)** à dessein.
+- **Humain dans la boucle** : on intervient en direct dans un débat (ressenti / orientation
+  / apport) ; le message est lu par les agents au tour suivant.
+- **Pépites & sorties** : on épingle (⭐) toute remarque marquante ; un onglet **Pépites**
+  rassemble les idées épinglées et **toutes les Fiches Protocole** produites. Depuis une
+  pépite, on peut **lancer un débat dédié** à cette idée.
+- **Anti-conformité & rapport minoritaire** intégrés au déroulé des tours.
+
+> Pistes proposées pour la suite (à valider) : tour de parole dynamique façon AutoGen ·
+> score de consensus + rejeu de session · upload multi-fichiers en glisser-déposer ·
+> export d'une Fiche Protocole en PDF · journal de tes tests réels rattaché à chaque débat.

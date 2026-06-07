@@ -9,6 +9,7 @@
     .phase-cadrage{border-color:#64748b} .phase-position{border-color:#10b981}
     .phase-critique{border-color:#f59e0b} .phase-convergence{border-color:#06b6d4}
     .phase-protocole{border-color:#a855f7} .phase-garde-fou{border-color:#ef4444}
+    .phase-humain{border-color:#eab308;background:#422006}
     .turn-content{white-space:pre-wrap}
   </style>
 </head>
@@ -42,6 +43,7 @@
     <button class="tab-btn px-4 py-2 rounded-lg" data-tab="agents">🧠 Agents</button>
     <button class="tab-btn px-4 py-2 rounded-lg" data-tab="sources">📚 Sources</button>
     <button class="tab-btn px-4 py-2 rounded-lg" data-tab="postulats">📌 Postulats</button>
+    <button class="tab-btn px-4 py-2 rounded-lg" data-tab="pepites">💎 Pépites</button>
   </div>
 
   <!-- ===================== DÉBATS ===================== -->
@@ -73,8 +75,21 @@
             </div>
           </div>
         </div>
-        <div id="liveFeed" class="space-y-2 text-sm max-h-[60vh] overflow-y-auto">
+        <div id="liveFeed" class="space-y-2 text-sm max-h-[55vh] overflow-y-auto">
           <p class="text-slate-500 text-sm">Sélectionne ou lance un débat pour voir les échanges en direct.</p>
+        </div>
+        <div id="humanBox" class="hidden mt-3 border-t border-slate-700 pt-3">
+          <div class="flex gap-2">
+            <select id="interveneKind" class="bg-slate-900 border border-slate-700 rounded p-2 text-xs">
+              <option value="ressenti">🫀 Ressenti</option>
+              <option value="orientation">🧭 Orientation</option>
+              <option value="source">➕ Apport</option>
+            </select>
+            <input id="interveneText" placeholder="Interviens dans le débat (ton ressenti, une piste, un fait…)" class="flex-1 bg-slate-900 border border-slate-700 rounded p-2 text-xs"
+              onkeydown="if(event.key==='Enter')sendIntervene()"/>
+            <button onclick="sendIntervene()" class="bg-yellow-600 hover:bg-yellow-500 rounded px-3 text-xs">Envoyer</button>
+          </div>
+          <p class="text-[10px] text-slate-500 mt-1">Ton message sera lu par les agents au tour suivant.</p>
         </div>
       </div>
     </div>
@@ -95,6 +110,7 @@
       </select>
       <input id="na_domain" placeholder="Domaine" class="bg-slate-900 border border-slate-700 rounded p-2 md:col-span-2" />
       <textarea id="na_persona" rows="3" placeholder="Persona (qui est cet agent, ce qu'il apporte)" class="bg-slate-900 border border-slate-700 rounded p-2 md:col-span-2"></textarea>
+      <textarea id="na_orientation" rows="2" placeholder="Orientation perso (optionnel) : un angle ou biais voulu pour cet agent" class="bg-slate-900 border border-yellow-700/40 rounded p-2 md:col-span-2"></textarea>
       <button onclick="createAgent()" class="bg-emerald-600 hover:bg-emerald-500 rounded px-3 py-2 md:col-span-2">Créer l'agent</button>
     </div>
     <div id="agentList" class="grid md:grid-cols-2 gap-4"></div>
@@ -147,6 +163,20 @@
       <div id="postulateList" class="space-y-2"></div>
     </div>
   </section>
+
+  <!-- ===================== PÉPITES ===================== -->
+  <section id="tab-pepites" class="hidden space-y-4">
+    <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700 space-y-3">
+      <h2 class="font-semibold">💎 Idées épinglées</h2>
+      <p class="text-xs text-slate-400">Les remarques marquées d'un ⭐ dans les débats. Clique « Débattre » pour lancer une session dédiée à cette idée.</p>
+      <div id="highlightList" class="space-y-2 text-sm"></div>
+    </div>
+    <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700 space-y-3">
+      <h2 class="font-semibold">🧪 Fiches Protocole produites</h2>
+      <p class="text-xs text-slate-400">Toutes les sorties concrètes, prêtes à tester dans le réel.</p>
+      <div id="protocolList" class="space-y-2 text-sm"></div>
+    </div>
+  </section>
 </div>
 
 <!-- ===================== CALIBRATE MODAL ===================== -->
@@ -191,11 +221,12 @@ async function boot(){
 document.querySelectorAll(".tab-btn").forEach(b=>b.onclick=()=>{
   document.querySelectorAll(".tab-btn").forEach(x=>x.classList.remove("bg-slate-800"));
   b.classList.add("bg-slate-800");
-  ["debats","agents","sources","postulats"].forEach(t=>$("tab-"+t).classList.add("hidden"));
+  ["debats","agents","sources","postulats","pepites"].forEach(t=>$("tab-"+t).classList.add("hidden"));
   $("tab-"+b.dataset.tab).classList.remove("hidden");
   if(b.dataset.tab==="agents") loadAgents();
   if(b.dataset.tab==="sources") loadSources();
   if(b.dataset.tab==="postulats") loadPostulates();
+  if(b.dataset.tab==="pepites") loadPepites();
 });
 
 // -------- Init --------
@@ -229,6 +260,7 @@ async function openDebate(id){
   currentDebate = id;
   const d = await api("/api/debates/"+id);
   $("liveHeader").classList.remove("hidden");
+  $("humanBox").classList.remove("hidden");
   $("liveId").textContent = id;
   $("liveQuestion").textContent = d.debate.question;
   $("liveStatus").textContent = d.debate.status;
@@ -260,10 +292,21 @@ function renderTurn(t){
   if(thinkingEl){ thinkingEl.remove(); thinkingEl=null; }
   const el=document.createElement("div");
   el.className=`bg-slate-900 rounded-lg p-3 border-l-4 phase-${t.phase}`;
-  el.innerHTML=`<div class="flex justify-between mb-1"><span class="font-medium">${t.agent_name}</span>
-    <span class="text-xs text-slate-500 uppercase">${t.phase}</span></div>
+  const star = t.phase==="humain" ? "" :
+    `<button title="Épingler comme pépite" onclick='highlightTurn(${JSON.stringify(t).replace(/'/g,"&#39;")})' class="text-xs text-slate-500 hover:text-yellow-400">⭐</button>`;
+  el.innerHTML=`<div class="flex justify-between mb-1 items-center"><span class="font-medium">${t.agent_name}</span>
+    <span class="flex items-center gap-2"><span class="text-xs text-slate-500 uppercase">${t.phase}</span>${star}</span></div>
     <div class="turn-content text-slate-300 text-sm">${escapeHtml(t.content)}</div>`;
   $("liveFeed").appendChild(el); scrollFeed();
+}
+async function highlightTurn(t){
+  await api("/api/highlights",{method:"POST",body:JSON.stringify({text:t.content,debate_id:t.debate_id,turn_id:t.id,note:t.agent_name})});
+  renderNote("⭐ Épinglé dans les Pépites.");
+}
+async function sendIntervene(){
+  const text=$("interveneText").value.trim(); if(!text||!currentDebate) return;
+  await api(`/api/debates/${currentDebate}/intervene`,{method:"POST",body:JSON.stringify({text,kind:$("interveneKind").value})});
+  $("interveneText").value="";
 }
 function renderNote(txt){
   const el=document.createElement("div");
@@ -302,6 +345,9 @@ async function loadAgents(){
       <details class="text-xs"><summary class="cursor-pointer text-slate-500">Persona</summary>
         <textarea onchange="saveLever('${a.id}','persona',this.value)" rows="4" class="w-full bg-slate-900 border border-slate-700 rounded p-2 mt-1">${escapeHtml(a.persona)}</textarea>
       </details>
+      <details class="text-xs" ${a.orientation?"open":""}><summary class="cursor-pointer text-yellow-500">🧭 Orientation (perso)</summary>
+        <textarea onchange="saveLever('${a.id}','orientation',this.value)" rows="2" placeholder="Oriente (ou désoriente) cet agent : un angle, un biais voulu, une contrainte…" class="w-full bg-slate-900 border border-yellow-700/40 rounded p-2 mt-1">${escapeHtml(a.orientation||"")}</textarea>
+      </details>
       <button onclick="delAgent('${a.id}')" class="text-xs text-red-400 hover:text-red-300">Supprimer</button>
     </div>`).join("");
 }
@@ -312,7 +358,8 @@ async function saveLever(id,key,val){
 function toggleNewAgent(){ $("newAgentForm").classList.toggle("hidden"); }
 async function createAgent(){
   const body={name:$("na_name").value,icon:$("na_icon").value,model:$("na_model").value,
-    provider:$("na_provider").value,domain:$("na_domain").value,persona:$("na_persona").value};
+    provider:$("na_provider").value,domain:$("na_domain").value,persona:$("na_persona").value,
+    orientation:$("na_orientation").value};
   if(!body.name) return;
   try{ await api("/api/agents",{method:"POST",body:JSON.stringify(body)}); toggleNewAgent(); loadAgents(); }
   catch(e){ alert(e.message); }
@@ -372,6 +419,34 @@ async function addPostulate(){
 }
 async function editPostulate(id,text){ await api("/api/postulates/"+id,{method:"PUT",body:JSON.stringify({text})}); loadPostulates(); }
 async function togglePostulate(id,active){ await api("/api/postulates/"+id,{method:"PUT",body:JSON.stringify({active})}); loadPostulates(); }
+
+// -------- Pépites / sorties --------
+async function loadPepites(){
+  const o = await api("/api/outputs");
+  $("highlightList").innerHTML = o.highlights.map(h=>`
+    <div class="bg-slate-900 rounded-lg p-3 border-l-4 border-yellow-500">
+      <div class="flex justify-between items-start gap-2">
+        <div class="turn-content text-slate-300 flex-1">${escapeHtml(h.text)}</div>
+        <div class="flex flex-col gap-1 shrink-0">
+          <button onclick='debateIdea(${JSON.stringify(h.text)})' class="text-xs bg-emerald-700/60 hover:bg-emerald-600 rounded px-2 py-1">Débattre</button>
+          <button onclick="delHighlight(${h.id})" class="text-xs text-red-400 hover:text-red-300">Retirer</button>
+        </div>
+      </div>
+      ${h.note?`<p class="text-[10px] text-slate-500 mt-1">via ${escapeHtml(h.note)}</p>`:""}
+    </div>`).join("") || '<p class="text-slate-500 text-sm">Aucune pépite. Épingle des remarques avec ⭐ pendant un débat.</p>';
+  $("protocolList").innerHTML = o.protocols.map(p=>`
+    <details class="bg-slate-900 rounded-lg p-3 border-l-4 border-purple-500">
+      <summary class="cursor-pointer text-slate-300">🧪 Débat #${p.debate_id} · tour ${p.round} <span class="text-slate-500">— ${escapeHtml((p.debate_question||"").slice(0,60))}</span></summary>
+      <div class="turn-content text-slate-300 text-sm mt-2">${escapeHtml(p.content)}</div>
+    </details>`).join("") || '<p class="text-slate-500 text-sm">Aucune Fiche Protocole produite pour l\'instant.</p>';
+}
+async function delHighlight(id){ await api("/api/highlights/"+id,{method:"DELETE"}); loadPepites(); }
+async function debateIdea(text){
+  const q = "Approfondir cette piste issue d'un débat précédent : " + text;
+  const r = await api("/api/debates",{method:"POST",body:JSON.stringify({question:q})});
+  document.querySelector('.tab-btn[data-tab="debats"]').click();
+  await loadDebates(); openDebate(r.id);
+}
 
 function escapeHtml(s){ return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 

@@ -9,6 +9,7 @@ top_p: 0.95
 max_context: 8000
 order: 10
 domain: "Hypnose, inductions, langage hypnotique, états modifiés de conscience"
+orientation: ""
 persona: |
   Tu es le praticien Hypnose du cénacle Aletheia. Tu maîtrises les inductions,
   le langage hypnotique (Erickson, métaphores, suggestions indirectes), les

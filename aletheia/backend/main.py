@@ -89,6 +89,7 @@ class AgentIn(BaseModel):
     max_context: int = 8000
     domain: str = ""
     persona: str = ""
+    orientation: str = ""
     order: int = 100
 
 
@@ -248,6 +249,47 @@ class CalibrationIn(BaseModel):
 async def calibrate_debate(debate_id: int, body: CalibrationIn):
     await manager.calibrate(debate_id, body.note, body.payload)
     return {"ok": True}
+
+
+class InterveneIn(BaseModel):
+    text: str
+    kind: str = "ressenti"   # ressenti | orientation | source
+
+
+@app.post("/api/debates/{debate_id}/intervene", dependencies=[Depends(auth.require_auth)])
+async def intervene(debate_id: int, body: InterveneIn):
+    return await manager.intervene(debate_id, body.text, body.kind)
+
+
+# ============================================== Pépites / sorties des débats
+class HighlightIn(BaseModel):
+    text: str
+    debate_id: int | None = None
+    turn_id: int | None = None
+    note: str = ""
+
+
+@app.get("/api/highlights", dependencies=[Depends(auth.require_auth)])
+def get_highlights():
+    return db.list_highlights()
+
+
+@app.post("/api/highlights", dependencies=[Depends(auth.require_auth)])
+def create_highlight(body: HighlightIn):
+    hid = db.add_highlight(body.text, body.debate_id, body.turn_id, body.note)
+    return {"id": hid}
+
+
+@app.delete("/api/highlights/{hid}", dependencies=[Depends(auth.require_auth)])
+def remove_highlight(hid: int):
+    db.delete_highlight(hid)
+    return {"ok": True}
+
+
+@app.get("/api/outputs", dependencies=[Depends(auth.require_auth)])
+def get_outputs():
+    """Sorties concrètes : toutes les Fiches Protocole + les pépites épinglées."""
+    return {"protocols": db.list_protocols(), "highlights": db.list_highlights()}
 
 
 # =================================================================== WebSocket
