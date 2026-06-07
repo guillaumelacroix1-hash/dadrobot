@@ -81,7 +81,7 @@ async def explain_highlight(text: str, debate_id: int) -> str:
             "pourquoi elle est notable.")
     try:
         return await llm.chat("anthropic", "claude-sonnet-4-6", system, user,
-                              temperature=0.4, max_tokens=220)
+                              temperature=0.4, max_tokens=350)
     except Exception:  # noqa: BLE001
         return ""
 
@@ -119,7 +119,7 @@ async def consolidate_learnings(debate_id: int) -> int:
                 "préambule — uniquement les puces.")
         try:
             txt = (await llm.chat(a.provider, a.model, system, user,
-                                  temperature=0.5, max_tokens=240)).strip()
+                                  temperature=0.5, max_tokens=400)).strip()
         except Exception:  # noqa: BLE001
             continue
         if txt:
@@ -394,7 +394,7 @@ class DebateRuntime:
                             "principales de ce tour et où on en est. Ton accessible, zéro jargon.")
                     try:
                         vulg = (await llm.chat("anthropic", "claude-sonnet-4-6",
-                                               sysv, usrv, 0.4, 0.9, 320)).strip()
+                                               sysv, usrv, 0.4, 0.9, 700)).strip()
                     except Exception:  # noqa: BLE001
                         vulg = ""
                     if vulg:
