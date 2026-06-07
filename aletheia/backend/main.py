@@ -224,6 +224,9 @@ class DebateIn(BaseModel):
     question: str
     participants: list[str] | None = None   # ids des praticiens autorisés (None = tous)
     moderator_selects: bool = True           # le Modérateur affine-t-il à chaque tour ?
+    auto_advance: bool = True                # enchaîner les tours jusqu'au consensus
+    consensus_target: int = 75               # seuil de consensus (%) déclenchant l'arrêt
+    max_rounds: int = 8                      # garde-fou : nb de tours max en mode auto
 
 
 @app.get("/api/debates", dependencies=[Depends(auth.require_auth)])
@@ -233,7 +236,8 @@ def get_debates():
 
 @app.post("/api/debates", dependencies=[Depends(auth.require_auth)])
 async def start_debate(body: DebateIn):
-    debate_id = manager.start(body.question, body.participants, body.moderator_selects)
+    debate_id = manager.start(body.question, body.participants, body.moderator_selects,
+                              body.auto_advance, body.consensus_target, body.max_rounds)
     return {"id": debate_id}
 
 

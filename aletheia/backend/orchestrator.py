@@ -151,11 +151,17 @@ def shared_frame(question: str) -> str:
 class DebateRuntime:
     def __init__(self, debate_id: int, question: str,
                  participants: list[str] | None = None,
-                 moderator_selects: bool = True):
+                 moderator_selects: bool = True,
+                 auto_advance: bool = True,
+                 consensus_target: int = 75,
+                 max_rounds: int = 8):
         self.debate_id = debate_id
         self.question = question
         self.participants = set(participants) if participants else None
         self.moderator_selects = moderator_selects
+        self.auto_advance = auto_advance          # enchaîner les tours jusqu'au consensus
+        self.consensus_target = consensus_target  # seuil (%) qui déclenche l'arrêt
+        self.max_rounds = max_rounds              # garde-fou : nb de tours max en auto
         self.subscribers: set[asyncio.Queue] = set()
         self.resume_event = asyncio.Event()
         self.resume_event.set()
@@ -267,6 +273,7 @@ class DebateRuntime:
                 rnd = (db.get_debate(self.debate_id) or {}).get("round", 0) + 1
                 db.set_debate_round(self.debate_id, rnd)
                 await self.emit({"type": "round_start", "round": rnd})
+                round_consensus = None
 
                 agents = load_agents()
                 all_prats = praticiens(agents)
@@ -325,6 +332,7 @@ class DebateRuntime:
                         use_rag=False)
                     if conv:
                         score, state = parse_consensus(conv["content"])
+                        round_consensus = score
                         db.add_metric(self.debate_id, rnd, score, state)
                         await self.emit({"type": "consensus", "round": rnd,
                                          "consensus": score, "state": state})
@@ -354,9 +362,19 @@ class DebateRuntime:
 
                 await self.bb.refresh_summary()
                 await self.emit({"type": "round_done", "round": rnd})
-                # Pause automatique : place au test dans le réel.
-                self.resume_event.clear()
-                await self._gate()
+                # Enchaîner le tour suivant, ou s'arrêter pour laisser tester dans le réel ?
+                stop_here, reason = True, "fin de tour"
+                if self.auto_advance:
+                    if round_consensus is not None and round_consensus >= self.consensus_target:
+                        reason = f"consensus {round_consensus}% atteint (cible {self.consensus_target}%)"
+                    elif rnd >= self.max_rounds:
+                        reason = f"{self.max_rounds} tours atteints sans consensus suffisant"
+                    else:
+                        stop_here = False        # on enchaîne directement le tour suivant
+                if stop_here:
+                    await self.emit({"type": "autopause", "reason": reason})
+                    self.resume_event.clear()
+                    await self._gate()
         except StopDebate:
             pass
         finally:
@@ -370,9 +388,11 @@ class DebateManager:
         self.runtimes: dict[int, DebateRuntime] = {}
 
     def start(self, question: str, participants: list[str] | None = None,
-              moderator_selects: bool = True) -> int:
+              moderator_selects: bool = True, auto_advance: bool = True,
+              consensus_target: int = 75, max_rounds: int = 8) -> int:
         debate_id = db.create_debate(question)
-        rt = DebateRuntime(debate_id, question, participants, moderator_selects)
+        rt = DebateRuntime(debate_id, question, participants, moderator_selects,
+                           auto_advance, consensus_target, max_rounds)
         self.runtimes[debate_id] = rt
         rt.task = asyncio.create_task(rt.run())
         return debate_id

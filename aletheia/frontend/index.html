@@ -105,6 +105,23 @@
           </label>
         </div>
       </details>
+      <details class="text-sm bg-slate-900/40 rounded-lg p-3">
+        <summary class="cursor-pointer text-slate-300">⚙️ Avancement du débat</summary>
+        <div class="mt-3 space-y-2 text-xs">
+          <label class="flex items-center gap-2 text-slate-300">
+            <input type="radio" name="advMode" value="auto" checked class="accent-emerald-500"/>
+            Délibérer automatiquement jusqu'au consensus
+          </label>
+          <div class="flex items-center gap-2 pl-6 text-slate-400">
+            seuil <input id="consensusTarget" type="number" min="0" max="100" value="75" class="w-16 bg-slate-900 border border-slate-700 rounded p-1"/> %
+            · max <input id="maxRounds" type="number" min="1" max="30" value="8" class="w-14 bg-slate-900 border border-slate-700 rounded p-1"/> tours
+          </div>
+          <label class="flex items-center gap-2 text-slate-300">
+            <input type="radio" name="advMode" value="step" class="accent-emerald-500"/>
+            Pas à pas <span class="text-slate-600">(pause à chaque tour, je relance moi-même)</span>
+          </label>
+        </div>
+      </details>
       <button onclick="startDebate()" class="bg-emerald-600 hover:bg-emerald-500 rounded-lg px-4 py-2 text-sm font-medium">▶️ Lancer le cénacle</button>
     </div>
 
@@ -420,11 +437,18 @@ async function startDebate(){
   const q = $("debateQuestion").value.trim();
   if(!q) return;
   const parts = [...document.querySelectorAll('.part-cb:checked')].map(c=>c.value);
-  const body = { question:q, moderator_selects: $("moderatorSelects") ? $("moderatorSelects").checked : true };
+  const auto = ((document.querySelector('input[name="advMode"]:checked')||{}).value !== "step");
+  const body = {
+    question:q,
+    moderator_selects: $("moderatorSelects") ? $("moderatorSelects").checked : true,
+    auto_advance: auto,
+    consensus_target: parseInt(($("consensusTarget")||{}).value)||75,
+    max_rounds: parseInt(($("maxRounds")||{}).value)||8
+  };
   if(parts.length) body.participants = parts;
   const r = await api("/api/debates",{method:"POST",body:JSON.stringify(body)});
   $("debateQuestion").value="";
-  toast(`▶️ Débat #${r.id} lancé (${parts.length||"tous"} praticiens${body.moderator_selects?", Modérateur affine":""})`);
+  toast(`▶️ Débat #${r.id} lancé`+(auto?` — auto jusqu'à ${body.consensus_target}% (max ${body.max_rounds} tours)`:" — pas à pas"));
   await loadDebates(); openDebate(r.id);
 }
 async function openDebate(id){
@@ -461,7 +485,8 @@ function handleWs(m){
   else if(m.type==="thinking") showThinking(m);
   else if(m.type==="calibration") renderNote(`🎛️ Calibrage (tour ${m.round}) : ${m.note}`);
   else if(m.type==="consensus") showConsensus(m);
-  else if(m.type==="round_done") renderNote(`✅ Fin du tour ${m.round} — en pause. Teste dans le réel, puis « Relancer ».`);
+  else if(m.type==="round_done") renderNote(`✅ Fin du tour ${m.round}`);
+  else if(m.type==="autopause") renderNote(`⏸️ En pause — ${m.reason}. Teste dans le réel, puis « Relancer ».`);
   else if(m.type==="nugget"){ renderNote(`💡 Pépite candidate proposée : ${m.text}`); toast("💎 Pépite candidate — voir l'onglet Pépites"); }
 }
 function applyStatus(s){
