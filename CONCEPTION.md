@@ -128,6 +128,22 @@ C'est ce que l'humain teste. Format type :
 - **Précautions** (sécurité — ex. photosensibilité pour la lumière pulsée)
 - **Variante à tester au prochain tour**
 
+### Pilotage en temps réel — stop, calibrage, reprise
+
+Un débat n'est pas une boîte noire qu'on lance et qu'on subit : il se **pilote**.
+
+- **États d'un débat** : `en cours` · `en pause` · `en calibrage` · `terminé`.
+- **Stop / pause** à tout moment, sans rien perdre (l'état et le fil sont sauvegardés).
+- **Calibrage** pendant la pause — on ajuste puis on **relance** d'où on s'était arrêté :
+  - modifier les **leviers** d'un ou plusieurs agents (modèle, température, persona) ;
+  - **éditer les postulats** actifs ;
+  - **enrichir la base de connaissances** d'un agent (voir §6) — son savoir augmente
+    immédiatement pour la suite du débat ;
+  - **ajouter / retirer un spécialiste** en cours de route ;
+  - réorienter la sous-question.
+- Chaque calibrage est **horodaté et enregistré** comme un « point de calibrage » dans la
+  chronologie du débat : on voit *quel réglage a produit quel virage* dans les idées.
+
 ---
 
 ## 6. Architecture technique
@@ -140,11 +156,35 @@ C'est ce que l'humain teste. Format type :
 | **Accès** | **Login protégé** (mot de passe) | L'URL est publique : le labo, les sources et les clés restent privés |
 | **Modèles praticiens** | **Via API — passerelle OpenRouter** (+ Groq pour la vitesse) | Paliers gratuits / très bon marché ; changer le modèle d'un agent = changer une ligne |
 | **Modèles processus** | **API Claude (Anthropic)** | Synthèse et cadrage de haute qualité, peu de tokens (interventions ciblées) |
-| **Cerveau de chaque agent** | **RAG** — ChromaDB + documents par agent | Permet d'injecter des sources *hors internet* fournies par l'humain |
+| **Cerveau de chaque agent** | **RAG** — ChromaDB + sources multi-formats par agent | Injecter des sources *hors internet*, et **enrichissables à chaud** |
+| **Ingestion des sources** | Livre/PDF, texte, page web, **vidéo & YouTube** (transcription auto) | Une base **vivante et mixte** (voir ci-dessous) |
 | **Mémoire / grand contexte** | Tableau noir partagé + résumés roulants | Fil long sans explosion de tokens |
-| **Persistance** | **SQLite** + transcripts Markdown | Tout est enregistré : tours, synthèses, protocoles, postulats actifs |
-| **Backend** | **Python + FastAPI + WebSocket** | Débat visible en direct |
-| **Frontend** | Tableau de bord web (style Tailwind, cohérent avec l'existant) | Lancer, régler, uploader, éditer, relire |
+| **Persistance** | **SQLite** + transcripts Markdown | Tout est enregistré : tours, synthèses, protocoles, postulats, calibrages |
+| **Backend** | **Python + FastAPI + WebSocket** | Débat visible et pilotable en direct |
+| **Frontend** | Tableau de bord web (style Tailwind, cohérent avec l'existant) | Lancer, piloter, régler, uploader, éditer, relire |
+
+### Base de connaissances — multi-source et vivante
+
+Le « cerveau » de chaque praticien est **enrichissable à tout moment**, même pendant un
+débat (le nouveau savoir est disponible dès le tour suivant). Sources acceptées :
+
+| Type | Comment c'est ingéré |
+|---|---|
+| 📕 **Livre / PDF** | Extraction du texte → découpage → indexation dans le RAG de l'agent |
+| 📝 **Texte / note** | Collé ou déposé directement |
+| 🔗 **Page web** | Récupération + nettoyage de l'article |
+| ▶️ **YouTube** | **Récupération automatique de la transcription** (sous-titres) → indexation |
+| 🎞️ **Vidéo / audio** | Transcription automatique (Whisper via Groq) quand il n'y a pas de sous-titres |
+
+Pour YouTube : récupération directe des sous-titres existants (rapide, gratuit) ; si une
+vidéo n'en a pas, on retombe sur la transcription audio automatique. Chaque source garde
+sa **provenance** (titre, URL, type) pour que les agents puissent citer d'où vient une idée.
+
+### Ajout d'un spécialiste à chaud
+
+Ajouter un agent = créer une configuration (modèle + persona + sa base de sources), **depuis
+le tableau de bord, à tout moment** — y compris en plein débat lors d'un calibrage. Le
+nouveau spécialiste rejoint le cercle au tour suivant.
 
 ### Hébergement & accès (100 % web)
 
@@ -174,14 +214,15 @@ le PC du porteur n'est plus dans la boucle (la contrainte GPU AMD Vega disparaî
 aletheia/
 ├── backend/
 │   ├── main.py              # serveur FastAPI + WebSocket
-│   ├── orchestrator.py      # moteur du débat (tours, critique croisée, synthèse)
+│   ├── orchestrator.py      # moteur du débat (tours, critique, pause/calibrage/reprise)
 │   ├── agents.py            # chargement des agents + appels API (OpenRouter/Groq) + Claude
-│   ├── rag.py               # ingestion des sources + recherche (Chroma)
+│   ├── rag.py               # recherche dans la base de connaissances (Chroma)
+│   ├── ingestion.py         # ingestion multi-source : PDF, texte, web, YouTube, audio/vidéo
 │   ├── memory.py            # tableau noir + résumés roulants
 │   ├── postulates.py        # Registre des Postulats (édition + versionnage)
 │   ├── auth.py              # login / accès protégé par mot de passe
-│   └── db.py                # SQLite (débats, tours, protocoles, postulats)
-├── agents/                  # 1 fichier de config par agent
+│   └── db.py                # SQLite (débats, tours, protocoles, postulats, calibrages, sources)
+├── agents/                  # 1 fichier de config par agent (créable à chaud)
 │   ├── hypnose.yaml
 │   ├── lumiere.yaml
 │   ├── resonance.yaml
@@ -220,9 +261,11 @@ Chaque fichier `agents/*.yaml` expose les réglages modifiables :
 - **Accès** : **login protégé** par mot de passe.
 - **Mise en place** : je recommande la plateforme et gère le déploiement ; le porteur crée les comptes/clés.
 - **Interface** : **tableau de bord web**.
-- **Cénacle** : **8 praticiens** (dont **agent Résonance dédié**) + **3 processus**.
+- **Cénacle** : **8 praticiens** (dont **agent Résonance dédié**) + **3 processus**, **extensible à chaud** (ajout d'un spécialiste à tout moment).
 - **Objectif** : formulation **large et ouverte**.
 - **Postulats** : **Registre éditable et versionné**, injecté dans tous les agents.
+- **Pilotage** : débats **stoppables / calibrables / relançables**, avec points de calibrage horodatés.
+- **Base de connaissances** : **multi-source** (livre/PDF, texte, web, **YouTube**, vidéo/audio) et **enrichissable à chaud**, transcriptions automatiques.
 
 ---
 
@@ -230,10 +273,10 @@ Chaque fichier `agents/*.yaml` expose les réglages modifiables :
 
 1. Squelette projet + base SQLite + fichiers de configuration des agents.
 2. Connexion des modèles **via API** (OpenRouter/Groq) + **API Claude** + login d'accès.
-3. **RAG** : ingestion des sources par agent.
+3. **Base de connaissances multi-source** : ingestion PDF/texte/web + **YouTube** (transcription auto) + audio/vidéo, par agent, **enrichissable à chaud**.
 4. **Registre des Postulats** (édition, versionnage, injection).
-5. **Moteur de débat** + mémoire / résumés roulants.
-6. **Tableau de bord web** (débat live, réglages, sources, postulats, historique).
+5. **Moteur de débat** + mémoire / résumés roulants + **pilotage stop / calibrage / reprise**.
+6. **Tableau de bord web** : débat live et pilotable, réglages des agents, **ajout d'un spécialiste à chaud**, gestion des sources, postulats, historique.
 7. **Déploiement** sur le serveur géré (cible Render) + mise en ligne accessible 24h/24.
 8. Première session de test sur l'étoile polaire.
 
