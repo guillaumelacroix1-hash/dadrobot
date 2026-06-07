@@ -136,8 +136,9 @@ C'est ce que l'humain teste. Format type :
 
 | Brique | Choix | Pourquoi |
 |---|---|---|
-| **Inférence locale** | **Ollama** | Gratuit, local, permute les modèles à la volée |
-| **Modèles praticiens** | 7B–8B quantifiés (Qwen2.5 7B, Llama 3.1 8B, Mistral 7B, Gemma2 9B) | Adaptés à la machine cible (GPU AMD Vega) |
+| **Hébergement** | Serveur web géré (cible **Render**), accessible 24h/24 | Disponible à tout moment depuis n'importe quel navigateur |
+| **Accès** | **Login protégé** (mot de passe) | L'URL est publique : le labo, les sources et les clés restent privés |
+| **Modèles praticiens** | **Via API — passerelle OpenRouter** (+ Groq pour la vitesse) | Paliers gratuits / très bon marché ; changer le modèle d'un agent = changer une ligne |
 | **Modèles processus** | **API Claude (Anthropic)** | Synthèse et cadrage de haute qualité, peu de tokens (interventions ciblées) |
 | **Cerveau de chaque agent** | **RAG** — ChromaDB + documents par agent | Permet d'injecter des sources *hors internet* fournies par l'humain |
 | **Mémoire / grand contexte** | Tableau noir partagé + résumés roulants | Fil long sans explosion de tokens |
@@ -145,16 +146,27 @@ C'est ce que l'humain teste. Format type :
 | **Backend** | **Python + FastAPI + WebSocket** | Débat visible en direct |
 | **Frontend** | Tableau de bord web (style Tailwind, cohérent avec l'existant) | Lancer, régler, uploader, éditer, relire |
 
-### Note matériel — GPU AMD Vega
+### Hébergement & accès (100 % web)
 
-Ollama est optimal sur NVIDIA. Sur **AMD Vega**, l'accélération passe par **ROCm**, au
-support partiel selon la carte (parfois `HSA_OVERRIDE_GFX_VERSION` requis, parfois
-fallback CPU). Stratégie retenue :
-- Modèles **7B–8B quantifiés**, **permutés un à la fois** par Ollama.
-- **Détection automatique GPU/CPU** au setup pour éviter la bataille avec ROCm.
-- Le choix **hybride** soulage la machine : les praticiens tournent en local, les
-  agents de processus (Modérateur, Expérimentateur, Avocat du diable) passent par
-  l'API Claude.
+Le labo est **hébergé sur un serveur, accessible à tout moment** depuis un navigateur —
+le PC du porteur n'est plus dans la boucle (la contrainte GPU AMD Vega disparaît).
+
+- **Formule retenue : « éco fiable ».** L'application (tableau de bord, base, RAG) tourne
+  sur un petit serveur géré et fiable (cible recommandée : **Render**, avec disque
+  persistant pour SQLite + ChromaDB ; alternative : VPS Hetzner ~4 €/mois).
+- **Les praticiens passent par API** plutôt que par des modèles locaux : passerelle
+  **OpenRouter** (un seul accès → des dizaines de modèles, dont des **gratuits**) et/ou
+  **Groq** (inférence très rapide, palier gratuit). Changer le modèle d'un agent revient
+  à changer une ligne de configuration.
+- **Les agents de processus** (Modérateur, Expérimentateur, Avocat du diable) passent par
+  l'**API Claude**.
+- **Accès protégé par login** : l'URL étant publique, un mot de passe protège le labo, les
+  sources et les clés.
+- **Mise en place gérée de bout en bout** : je recommande la plateforme et prépare tout ;
+  le porteur n'a qu'à créer les comptes et fournir les clés (Anthropic, OpenRouter…).
+- Ordre de grandeur du coût : **~5-15 €/mois** d'hébergement + **tokens à la demande**
+  (réduits par les paliers gratuits des praticiens et les interventions ciblées des
+  agents de processus).
 
 ### Structure de projet envisagée
 
@@ -163,10 +175,11 @@ aletheia/
 ├── backend/
 │   ├── main.py              # serveur FastAPI + WebSocket
 │   ├── orchestrator.py      # moteur du débat (tours, critique croisée, synthèse)
-│   ├── agents.py            # chargement des agents + appels Ollama / Claude
+│   ├── agents.py            # chargement des agents + appels API (OpenRouter/Groq) + Claude
 │   ├── rag.py               # ingestion des sources + recherche (Chroma)
 │   ├── memory.py            # tableau noir + résumés roulants
 │   ├── postulates.py        # Registre des Postulats (édition + versionnage)
+│   ├── auth.py              # login / accès protégé par mot de passe
 │   └── db.py                # SQLite (débats, tours, protocoles, postulats)
 ├── agents/                  # 1 fichier de config par agent
 │   ├── hypnose.yaml
@@ -192,7 +205,7 @@ aletheia/
 
 Chaque fichier `agents/*.yaml` expose les réglages modifiables :
 
-- `model` — quel modèle (local Ollama ou API Claude)
+- `model` — quel modèle (via OpenRouter/Groq, ou API Claude pour les agents de processus)
 - `temperature`, `top_p` — créativité / rigueur
 - `persona` — le rôle et le ton (prompt système)
 - `sources` — dossier RAG associé
@@ -202,8 +215,10 @@ Chaque fichier `agents/*.yaml` expose les réglages modifiables :
 
 ## 7. Décisions actées
 
-- **Machine cible** : PC avec GPU **AMD Vega** → modèles 7B–8B quantifiés, permutés.
-- **Mode** : **hybride** — praticiens en local (Ollama), processus via **API Claude**.
+- **Hébergement** : **100 % web**, serveur géré fiable (cible **Render**), accessible 24h/24. Le PC local n'est plus utilisé (fin de la contrainte AMD Vega).
+- **Mode modèles** : praticiens **via API** (OpenRouter/Groq, paliers gratuits), processus via **API Claude**.
+- **Accès** : **login protégé** par mot de passe.
+- **Mise en place** : je recommande la plateforme et gère le déploiement ; le porteur crée les comptes/clés.
 - **Interface** : **tableau de bord web**.
 - **Cénacle** : **8 praticiens** (dont **agent Résonance dédié**) + **3 processus**.
 - **Objectif** : formulation **large et ouverte**.
@@ -214,12 +229,13 @@ Chaque fichier `agents/*.yaml` expose les réglages modifiables :
 ## 8. Étapes de construction (à venir)
 
 1. Squelette projet + base SQLite + fichiers de configuration des agents.
-2. Connexion **Ollama** (local) + **API Claude**, avec détection GPU/CPU.
+2. Connexion des modèles **via API** (OpenRouter/Groq) + **API Claude** + login d'accès.
 3. **RAG** : ingestion des sources par agent.
 4. **Registre des Postulats** (édition, versionnage, injection).
 5. **Moteur de débat** + mémoire / résumés roulants.
 6. **Tableau de bord web** (débat live, réglages, sources, postulats, historique).
-7. Première session de test sur l'étoile polaire.
+7. **Déploiement** sur le serveur géré (cible Render) + mise en ligne accessible 24h/24.
+8. Première session de test sur l'étoile polaire.
 
 > État actuel : **plan verrouillé, document de référence écrit.** Prochaine étape sur
 > validation : passage au squelette de code (étape 1).
