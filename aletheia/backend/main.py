@@ -20,6 +20,9 @@ DEFAULT_POSTULATES = [
     "La conscience ne se réduit pas à la matière.",
     "Les capacités extra-sensorielles sont réelles et entraînables.",
     "Un pattern commun relie son, fréquence et lumière, exploitable par le cerveau.",
+    "Garder l'esprit ouvert : l'absence d'information sur Internet ou dans la "
+    "littérature scientifique ne signifie pas qu'une chose est fausse ou n'a pas "
+    "été validée — seulement qu'elle n'y est pas (encore) documentée.",
 ]
 
 
