@@ -77,6 +77,10 @@ par débat »).
   redémarrage serveur, en relisant le cadre depuis la base (`/api/debates/{id}/resume`).
 - **Robustesse LLM** (`llm.py`) : retry/back-off sur `429/5xx`, masquage des balises
   `<think>…</think>` (modèles raisonneurs), **User-Agent explicite** (sinon Groq renvoie 403).
+- **Accès web par agent** (`Agent.web`, toggle 🌐, off par défaut) : plugin de recherche web
+  OpenRouter (`plugins:[{id:web,max_results:3}]`) → résultats frais injectés (praticiens only).
+- **Vulgarisation** : à la fin de **chaque tour**, un message « 🔆 En clair » (phase
+  `vulgarisation`, agent `vulgarisateur`) résume les trouvailles en langage simple (via Claude).
 
 ## 4. Architecture & déploiement
 

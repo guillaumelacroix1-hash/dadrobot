@@ -290,6 +290,7 @@ class DebateRuntime:
                 db.set_debate_round(self.debate_id, rnd)
                 await self.emit({"type": "round_start", "round": rnd})
                 round_consensus = None
+                conv = None
 
                 agents = load_agents()
                 all_prats = praticiens(agents)
@@ -357,10 +358,11 @@ class DebateRuntime:
                                              note="Modérateur · candidate", status="candidate",
                                              context=n["context"])
                             await self.emit({"type": "nugget", "text": n["text"]})
+                proto_turn = None
                 if exp and self.deliverable != "libre":
                     instr = (FICHE_INSTRUCTION if self.deliverable == "protocole"
                              else SYNTHESE_INSTRUCTION)
-                    await self._speak(exp, rnd, "protocole", instr, use_rag=False)
+                    proto_turn = await self._speak(exp, rnd, "protocole", instr, use_rag=False)
                 if avc:
                     await self._speak(avc, rnd, "garde-fou",
                                       "Signale risques, biais et points invérifiables "
@@ -376,6 +378,28 @@ class DebateRuntime:
                         "ce stade : un protocole unique, intégré et concret, qui combine "
                         "le meilleur de toutes les pistes. Mentionne ce qu'il reste à "
                         "valider.", use_rag=False)
+
+                # Vulgarisation de fin de tour : un résumé clair, sans jargon.
+                src = ""
+                if conv:
+                    src += "CONVERGENCE :\n" + conv["content"] + "\n\n"
+                if proto_turn:
+                    src += "LIVRABLE :\n" + proto_turn["content"]
+                if src.strip():
+                    sysv = ("Tu es un vulgarisateur bienveillant : tu expliques simplement, "
+                            "sans jargon, à une personne non experte.")
+                    usrv = (f"Sujet du débat : {self.question}\n\nCE QUI RESSORT DE CE TOUR :\n"
+                            f"{src}\n\nRésume en 3 à 5 phrases CLAIRES et SIMPLES les trouvailles "
+                            "principales de ce tour et où on en est. Ton accessible, zéro jargon.")
+                    try:
+                        vulg = (await llm.chat("anthropic", "claude-sonnet-4-6",
+                                               sysv, usrv, 0.4, 0.9, 320)).strip()
+                    except Exception:  # noqa: BLE001
+                        vulg = ""
+                    if vulg:
+                        vt = db.add_turn(self.debate_id, rnd, "vulgarisation",
+                                         "vulgarisateur", "🔆 En clair", vulg)
+                        await self.emit({"type": "turn", **vt})
 
                 await self.bb.refresh_summary()
                 await self.emit({"type": "round_done", "round": rnd})
