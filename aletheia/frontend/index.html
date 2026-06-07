@@ -154,6 +154,17 @@
       <h2 class="font-semibold">Le cénacle</h2>
       <button onclick="toggleNewAgent()" class="bg-cyan-600 hover:bg-cyan-500 rounded-lg px-3 py-1.5 text-sm">➕ Ajouter un spécialiste</button>
     </div>
+    <details class="bg-slate-800 rounded-2xl p-4 border border-slate-700 text-sm">
+      <summary class="cursor-pointer font-semibold text-slate-300">ℹ️ Cadre commun injecté à chaque agent</summary>
+      <div class="mt-3 space-y-3 text-xs text-slate-400">
+        <div><span class="text-slate-200 font-medium">🎯 Objectif :</span> <span id="frameObjective"></span></div>
+        <div><span class="text-slate-200 font-medium">📌 Postulats actifs (dont la MISSION — éditables dans l'onglet Postulats) :</span>
+          <ul id="framePostulates" class="list-disc ml-5 mt-1 space-y-0.5"></ul></div>
+        <div><span class="text-slate-200 font-medium">🔓 Posture (praticiens) :</span>
+          <span class="italic"> explorer l'idée à fond sans débunkage réflexe, distinguer l'établi du spéculatif, être audacieux ET rigoureux.</span></div>
+        <p class="text-slate-600">En plus de ceci, chaque agent reçoit son persona + son orientation (ci-dessous), le contexte du débat en cours et ses sources (RAG).</p>
+      </div>
+    </details>
     <div id="newAgentForm" class="hidden bg-slate-800 rounded-2xl p-5 border border-cyan-700/50 grid md:grid-cols-2 gap-3 text-sm">
       <input id="na_name" placeholder="Nom (ex : Acoustique)" class="bg-slate-900 border border-slate-700 rounded p-2" />
       <input id="na_icon" placeholder="Icône (ex : 🔊)" value="🧠" class="bg-slate-900 border border-slate-700 rounded p-2" />
@@ -572,6 +583,7 @@ async function loadAgents(){
   agentsCache = await api("/api/agents");
   fillAgentSelect();
   renderParticipants();
+  loadAgentFrame();
   $("agentList").innerHTML = agentsCache.map(a=>`
     <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700 space-y-2 text-sm">
       <div class="flex justify-between items-center">
@@ -627,6 +639,15 @@ function updatePartCount(){
   if($("partCount")) $("partCount").textContent = (all.length && on.length===all.length) ? "tous" : `${on.length}/${all.length}`;
 }
 function setAllParts(v){ document.querySelectorAll('.part-cb').forEach(c=>c.checked=v); updatePartCount(); }
+async function loadAgentFrame(){
+  try{
+    const s = await api("/api/status");
+    if($("frameObjective")) $("frameObjective").textContent = s.objective || "";
+    const posts = await api("/api/postulates");
+    if($("framePostulates")) $("framePostulates").innerHTML =
+      posts.filter(p=>p.active).map(p=>`<li>${escapeHtml(p.text)}</li>`).join("") || "<li class='text-slate-600'>aucun</li>";
+  }catch(e){}
+}
 async function loadSources(){
   if(!agentsCache.length) await loadAgents();
   const list = await api("/api/sources");

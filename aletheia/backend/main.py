@@ -23,6 +23,10 @@ DEFAULT_POSTULATES = [
     "Garder l'esprit ouvert : l'absence d'information sur Internet ou dans la "
     "littérature scientifique ne signifie pas qu'une chose est fausse ou n'a pas "
     "été validée — seulement qu'elle n'y est pas (encore) documentée.",
+    "MISSION — Être précurseur : innover en tissant des liens entre des domaines qui "
+    "ne se parlent pas (sciences, traditions, symbolique, arts, vécu) pour trouver LA "
+    "clé concrète qui aide l'humain à relâcher ses filtres et devenir la meilleure "
+    "version de lui-même. Viser la synthèse audacieuse, au-delà des courants établis.",
 ]
 
 

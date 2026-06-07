@@ -11,6 +11,7 @@ throttlés quelques secondes avant de répondre normalement.
 from __future__ import annotations
 
 import asyncio
+import re
 
 import httpx
 
@@ -22,6 +23,14 @@ ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 
 # Statuts qu'on réessaie (quota momentané / indisponibilité du serveur amont).
 RETRYABLE = {429, 500, 502, 503, 504, 529}
+
+# Les modèles « raisonneurs » (Qwen3, R1…) émettent leur réflexion entre
+# <think>…</think> : on la retire avant affichage dans le débat.
+_THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
+
+
+def _clean(text: str) -> str:
+    return _THINK_RE.sub("", text or "").strip()
 
 
 class LLMError(RuntimeError):
@@ -112,7 +121,7 @@ async def _openai_compat(
         r = await _post_retry(client, url, headers, payload)
         r.raise_for_status()
         data = r.json()
-    return data["choices"][0]["message"]["content"].strip()
+    return _clean(data["choices"][0]["message"]["content"])
 
 
 async def _anthropic(
@@ -137,4 +146,4 @@ async def _anthropic(
         r.raise_for_status()
         data = r.json()
     parts = [b.get("text", "") for b in data.get("content", []) if b.get("type") == "text"]
-    return "".join(parts).strip()
+    return _clean("".join(parts))
