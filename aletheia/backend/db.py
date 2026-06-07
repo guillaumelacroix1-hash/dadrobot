@@ -154,6 +154,15 @@ def set_debate_status(debate_id: int, status: str) -> None:
         )
 
 
+def mark_stale_running_paused() -> int:
+    """Au (re)démarrage, aucun moteur ne tourne en mémoire : les débats restés
+    « en cours » sont en réalité figés → on les passe « en pause » pour qu'ils
+    soient reprenables (« Relancer » recrée le moteur et continue)."""
+    with _conn() as c:
+        cur = c.execute("UPDATE debates SET status='en pause' WHERE status='en cours'")
+        return cur.rowcount
+
+
 def set_debate_round(debate_id: int, rnd: int) -> None:
     with _conn() as c:
         c.execute(

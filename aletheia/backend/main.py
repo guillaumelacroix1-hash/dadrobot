@@ -33,6 +33,7 @@ DEFAULT_POSTULATES = [
 
 def _bootstrap() -> None:
     db.init_db()
+    db.mark_stale_running_paused()   # un redémarrage tue les moteurs en mémoire
     if not db.list_postulates():
         for p in DEFAULT_POSTULATES:
             db.add_postulate(p)
