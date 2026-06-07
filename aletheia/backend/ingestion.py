@@ -76,26 +76,51 @@ def youtube_id(url: str) -> str | None:
     return m.group(1) if m else (url if re.fullmatch(r"[A-Za-z0-9_-]{11}", url) else None)
 
 
-def ingest_youtube(agent_id: str, url: str, title: str | None = None) -> dict:
+def _seg_text(seg) -> str:
+    """Texte d'un segment, quelle que soit la version de l'API (dict ou objet)."""
+    if isinstance(seg, dict):
+        return seg.get("text", "")
+    return getattr(seg, "text", "") or ""
+
+
+def _fetch_youtube_transcript(vid: str) -> list | None:
+    """Récupère la transcription en gérant les deux API : >=1.0 (instance.fetch)
+    et <1.0 (classmethod get_transcript). Essaie fr, puis en, puis défaut."""
     from youtube_transcript_api import YouTubeTranscriptApi
 
+    fetch = None
+    try:                                    # API récente : YouTubeTranscriptApi().fetch(...)
+        fetch = YouTubeTranscriptApi().fetch
+    except Exception:  # noqa: BLE001       # API ancienne : pas d'instance utile
+        fetch = None
+    for langs in (["fr"], ["en"], ["fr", "en"], None):
+        try:
+            if fetch is not None:
+                data = fetch(vid, languages=langs) if langs else fetch(vid)
+            else:
+                data = (YouTubeTranscriptApi.get_transcript(vid, languages=langs)
+                        if langs else YouTubeTranscriptApi.get_transcript(vid))
+            segs = list(data)
+            if segs:
+                return segs
+        except Exception:  # noqa: BLE001
+            continue
+    return None
+
+
+def ingest_youtube(agent_id: str, url: str, title: str | None = None) -> dict:
     vid = youtube_id(url)
     if not vid:
         raise ValueError("Lien YouTube non reconnu")
-    transcript = None
-    for langs in (["fr"], ["en"], None):
-        try:
-            transcript = (YouTubeTranscriptApi.get_transcript(vid, languages=langs)
-                          if langs else YouTubeTranscriptApi.get_transcript(vid))
-            break
-        except Exception:  # noqa: BLE001
-            continue
-    if transcript is None:
+    transcript = _fetch_youtube_transcript(vid)
+    if not transcript:
         raise RuntimeError(
-            "Pas de transcription disponible pour cette vidéo "
-            "(envisager la transcription audio via Groq)."
+            "Transcription YouTube indisponible : soit la vidéo n'a pas de sous-titres, "
+            "soit YouTube bloque les requêtes venant du serveur (fréquent en hébergement). "
+            "👉 Télécharge l'audio/la vidéo et ajoute-le via « 📕 Fichier » (transcription "
+            "automatique par Groq Whisper), ou colle le texte dans « 📝 Texte / note »."
         )
-    text = " ".join(seg["text"] for seg in transcript)
+    text = " ".join(_seg_text(s) for s in transcript).strip()
     return _store(agent_id, "youtube", title or f"YouTube {vid}",
                   f"https://youtu.be/{vid}", text)
 

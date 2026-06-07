@@ -81,9 +81,13 @@ def shared_frame(question: str) -> str:
 
 
 class DebateRuntime:
-    def __init__(self, debate_id: int, question: str):
+    def __init__(self, debate_id: int, question: str,
+                 participants: list[str] | None = None,
+                 moderator_selects: bool = True):
         self.debate_id = debate_id
         self.question = question
+        self.participants = set(participants) if participants else None
+        self.moderator_selects = moderator_selects
         self.subscribers: set[asyncio.Queue] = set()
         self.resume_event = asyncio.Event()
         self.resume_event.set()
@@ -192,23 +196,31 @@ class DebateRuntime:
 
                 agents = load_agents()
                 all_prats = praticiens(agents)
+                if self.participants:
+                    chosen = [a for a in all_prats if a.id in self.participants]
+                    if chosen:
+                        all_prats = chosen
                 mod = process_agent(agents, "moderateur")
                 exp = process_agent(agents, "experimentateur")
                 avc = process_agent(agents, "avocat_du_diable")
                 syn = process_agent(agents, "synthetiseur")
 
-                # Cadrage + sélection dynamique des intervenants (façon GroupChatManager).
+                # Cadrage + (option) sélection dynamique des intervenants.
                 prats = all_prats
                 if mod:
                     ids = ", ".join(a.id for a in all_prats)
+                    sel_line = ""
+                    if self.moderator_selects:
+                        sel_line = (" Termine par une ligne « AGENTS À SOLLICITER : … » en "
+                                    f"choisissant parmi [{ids}] les 3 à 6 praticiens les plus "
+                                    "pertinents pour CE tour (garde de la diversité de points "
+                                    "de vue).")
                     cadre = await self._speak(
                         mod, rnd, "cadrage",
                         "Ouvre la session : rappelle l'objectif et les postulats, puis "
-                        "formule la sous-question du tour (4-6 lignes). Termine par une "
-                        f"ligne « AGENTS À SOLLICITER : … » en choisissant parmi [{ids}] "
-                        "les 3 à 6 praticiens les plus pertinents pour CE tour (garde de "
-                        "la diversité de points de vue).", use_rag=False)
-                    if rnd > 1 and cadre:
+                        "formule la sous-question du tour (4-6 lignes)." + sel_line,
+                        use_rag=False)
+                    if self.moderator_selects and rnd > 1 and cadre:
                         prats = parse_agent_selection(cadre["content"], all_prats)
 
                 for a in prats:
@@ -280,9 +292,10 @@ class DebateManager:
     def __init__(self):
         self.runtimes: dict[int, DebateRuntime] = {}
 
-    def start(self, question: str) -> int:
+    def start(self, question: str, participants: list[str] | None = None,
+              moderator_selects: bool = True) -> int:
         debate_id = db.create_debate(question)
-        rt = DebateRuntime(debate_id, question)
+        rt = DebateRuntime(debate_id, question, participants, moderator_selects)
         self.runtimes[debate_id] = rt
         rt.task = asyncio.create_task(rt.run())
         return debate_id

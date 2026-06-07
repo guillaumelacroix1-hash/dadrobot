@@ -80,6 +80,20 @@
     <div class="bg-slate-800 rounded-2xl p-5 border border-slate-700 space-y-3">
       <h2 class="font-semibold">Lancer une session</h2>
       <textarea id="debateQuestion" rows="2" placeholder="Sous-question du débat (ex : par quel levier simple lever les premiers filtres ?)" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500"></textarea>
+      <details class="text-sm bg-slate-900/40 rounded-lg p-3">
+        <summary class="cursor-pointer text-slate-300">👥 Participants (<span id="partCount">tous</span>)</summary>
+        <div class="mt-3 space-y-2">
+          <div class="flex gap-2 text-xs">
+            <button type="button" onclick="setAllParts(true)" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600">Tout cocher</button>
+            <button type="button" onclick="setAllParts(false)" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600">Tout décocher</button>
+          </div>
+          <div id="participantList" class="grid grid-cols-2 md:grid-cols-3 gap-x-3 gap-y-1"></div>
+          <label class="flex items-center gap-2 text-xs text-slate-400 pt-1">
+            <input type="checkbox" id="moderatorSelects" checked class="accent-emerald-500"/>
+            Laisser le Modérateur affiner qui parle à chaque tour <span class="text-slate-600">(sinon tous les cochés parlent à chaque tour)</span>
+          </label>
+        </div>
+      </details>
       <button onclick="startDebate()" class="bg-emerald-600 hover:bg-emerald-500 rounded-lg px-4 py-2 text-sm font-medium">▶️ Lancer le cénacle</button>
     </div>
 
@@ -366,9 +380,12 @@ async function loadDebates(){
 async function startDebate(){
   const q = $("debateQuestion").value.trim();
   if(!q) return;
-  const r = await api("/api/debates",{method:"POST",body:JSON.stringify({question:q})});
+  const parts = [...document.querySelectorAll('.part-cb:checked')].map(c=>c.value);
+  const body = { question:q, moderator_selects: $("moderatorSelects") ? $("moderatorSelects").checked : true };
+  if(parts.length) body.participants = parts;
+  const r = await api("/api/debates",{method:"POST",body:JSON.stringify(body)});
   $("debateQuestion").value="";
-  toast("▶️ Débat #"+r.id+" lancé");
+  toast(`▶️ Débat #${r.id} lancé (${parts.length||"tous"} praticiens${body.moderator_selects?", Modérateur affine":""})`);
   await loadDebates(); openDebate(r.id);
 }
 async function openDebate(id){
@@ -554,6 +571,7 @@ async function saveCalibrate(){
 async function loadAgents(){
   agentsCache = await api("/api/agents");
   fillAgentSelect();
+  renderParticipants();
   $("agentList").innerHTML = agentsCache.map(a=>`
     <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700 space-y-2 text-sm">
       <div class="flex justify-between items-center">
@@ -595,6 +613,20 @@ function fillAgentSelect(){
   const opts = agentsCache.filter(a=>a.role==="praticien").map(a=>`<option value="${a.id}">${a.icon} ${escapeHtml(a.name)}</option>`).join("");
   if($("srcAgent")) $("srcAgent").innerHTML = opts;
 }
+// -------- Sélecteur de participants (lanceur de débat) --------
+function renderParticipants(){
+  const el = $("participantList"); if(!el) return;
+  const prats = agentsCache.filter(a=>a.role==="praticien");
+  el.innerHTML = prats.map(a=>`<label class="flex items-center gap-1.5 text-xs text-slate-300">
+    <input type="checkbox" class="part-cb accent-emerald-500" value="${a.id}" checked onchange="updatePartCount()"/>
+    <span class="truncate">${a.icon} ${escapeHtml(a.name)}</span></label>`).join("");
+  updatePartCount();
+}
+function updatePartCount(){
+  const all=[...document.querySelectorAll('.part-cb')], on=all.filter(c=>c.checked);
+  if($("partCount")) $("partCount").textContent = (all.length && on.length===all.length) ? "tous" : `${on.length}/${all.length}`;
+}
+function setAllParts(v){ document.querySelectorAll('.part-cb').forEach(c=>c.checked=v); updatePartCount(); }
 async function loadSources(){
   if(!agentsCache.length) await loadAgents();
   const list = await api("/api/sources");

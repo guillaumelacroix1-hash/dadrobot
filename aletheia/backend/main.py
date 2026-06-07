@@ -206,6 +206,8 @@ async def add_file_source(agent_id: str, title: str, file: UploadFile):
 # ====================================================================== Débats
 class DebateIn(BaseModel):
     question: str
+    participants: list[str] | None = None   # ids des praticiens autorisés (None = tous)
+    moderator_selects: bool = True           # le Modérateur affine-t-il à chaque tour ?
 
 
 @app.get("/api/debates", dependencies=[Depends(auth.require_auth)])
@@ -215,7 +217,7 @@ def get_debates():
 
 @app.post("/api/debates", dependencies=[Depends(auth.require_auth)])
 async def start_debate(body: DebateIn):
-    debate_id = manager.start(body.question)
+    debate_id = manager.start(body.question, body.participants, body.moderator_selects)
     return {"id": debate_id}
 
 
