@@ -237,7 +237,8 @@ class DebateRuntime:
         return ("RETOURS DE TESTS RÉELS DE L'HUMAIN (à prendre au sérieux, ils priment "
                 "sur la théorie) :\n" + "\n".join(lines))
 
-    async def _speak(self, agent, rnd, phase, instruction, use_rag=True) -> dict | None:
+    async def _speak(self, agent, rnd, phase, instruction, use_rag=True,
+                     max_tokens: int = 1800) -> dict | None:
         await self._gate()
         await self.emit({"type": "thinking", "agent": f"{agent.icon} {agent.name}",
                          "phase": phase})
@@ -278,6 +279,7 @@ class DebateRuntime:
         try:
             content = await llm.chat(agent.provider, agent.model, system, user,
                                      agent.temperature, agent.top_p,
+                                     max_tokens=max_tokens,
                                      web=getattr(agent, "web", False))
         except llm.LLMError as e:
             content = f"⚠️ Modèle indisponible ({agent.name}) : {e}"
@@ -363,7 +365,8 @@ class DebateRuntime:
                 if exp and self.deliverable != "libre":
                     instr = (FICHE_INSTRUCTION if self.deliverable == "protocole"
                              else SYNTHESE_INSTRUCTION)
-                    proto_turn = await self._speak(exp, rnd, "protocole", instr, use_rag=False)
+                    proto_turn = await self._speak(exp, rnd, "protocole", instr,
+                                                   use_rag=False, max_tokens=6000)
                 if avc:
                     await self._speak(avc, rnd, "garde-fou",
                                       "Signale risques, biais et points invérifiables "
@@ -378,7 +381,7 @@ class DebateRuntime:
                         "tests) et propose LA VERSION LA PLUS ABOUTIE de la technique à "
                         "ce stade : un protocole unique, intégré et concret, qui combine "
                         "le meilleur de toutes les pistes. Mentionne ce qu'il reste à "
-                        "valider.", use_rag=False)
+                        "valider.", use_rag=False, max_tokens=4000)
 
                 # Vulgarisation de fin de tour : un résumé clair, sans jargon.
                 src = ""
