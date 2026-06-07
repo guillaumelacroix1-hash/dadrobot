@@ -92,6 +92,27 @@
       <h2 class="font-semibold">Lancer une session</h2>
       <textarea id="debateQuestion" rows="2" placeholder="Sous-question du débat (ex : par quel levier simple lever les premiers filtres ?)" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-sm outline-none focus:ring-2 focus:ring-emerald-500"></textarea>
       <details class="text-sm bg-slate-900/40 rounded-lg p-3">
+        <summary class="cursor-pointer text-slate-300">🎯 Cadre du débat <span class="text-slate-600">(objectif · axiomes · livrable)</span></summary>
+        <div class="mt-3 space-y-3 text-xs">
+          <div>
+            <label class="text-slate-400">Objectif / étoile polaire de CE débat</label>
+            <textarea id="objectiveInput" rows="2" placeholder="L'objectif global que poursuivent les agents pour ce débat" class="w-full mt-1 bg-slate-900 border border-slate-700 rounded p-2"></textarea>
+          </div>
+          <div>
+            <label class="text-slate-400">Axiomes applicables (décoche ceux hors-sujet)</label>
+            <div id="postulateSelect" class="mt-1 space-y-1 max-h-44 overflow-y-auto pr-1"></div>
+          </div>
+          <div>
+            <label class="text-slate-400">Livrable visé à chaque tour</label>
+            <select id="deliverable" class="mt-1 bg-slate-900 border border-slate-700 rounded p-2 w-full">
+              <option value="protocole">🧪 Protocole testable (défaut)</option>
+              <option value="synthese">📝 Synthèse &amp; recommandations</option>
+              <option value="libre">💬 Exploration libre (sans livrable imposé)</option>
+            </select>
+          </div>
+        </div>
+      </details>
+      <details class="text-sm bg-slate-900/40 rounded-lg p-3">
         <summary class="cursor-pointer text-slate-300">👥 Participants (<span id="partCount">tous</span>)</summary>
         <div class="mt-3 space-y-2">
           <div class="flex gap-2 text-xs">
@@ -416,7 +437,16 @@ async function init(){
   if(s.missing_keys.length) w.push(`<span class="text-amber-400">⚠️ Clés manquantes : ${s.missing_keys.join(", ")}</span>`);
   w.push(`<span class="text-slate-500">RAG : ${s.rag_backend} · ${s.agents} agents</span>`);
   $("warnings").innerHTML = w.join("<br>");
-  loadDebates(); loadAgents();
+  loadDebates(); loadAgents(); loadLaunchCadre();
+}
+async function loadLaunchCadre(){
+  try{
+    const s = await api("/api/status");
+    if($("objectiveInput") && !$("objectiveInput").value.trim()) $("objectiveInput").value = s.objective||"";
+    const posts = await api("/api/postulates");
+    if($("postulateSelect")) $("postulateSelect").innerHTML =
+      posts.filter(p=>p.active).map(p=>`<label class="flex items-start gap-1.5"><input type="checkbox" class="post-cb accent-emerald-500 mt-0.5" value="${p.id}" checked/><span>${escapeHtml(p.text)}</span></label>`).join("") || '<span class="text-slate-600">aucun axiome actif</span>';
+  }catch(e){}
 }
 
 // -------- Débats --------
@@ -443,9 +473,13 @@ async function startDebate(){
     moderator_selects: $("moderatorSelects") ? $("moderatorSelects").checked : true,
     auto_advance: auto,
     consensus_target: parseInt(($("consensusTarget")||{}).value)||75,
-    max_rounds: parseInt(($("maxRounds")||{}).value)||8
+    max_rounds: parseInt(($("maxRounds")||{}).value)||8,
+    objective: ($("objectiveInput")||{}).value||"",
+    deliverable: ($("deliverable")||{}).value||"protocole"
   };
   if(parts.length) body.participants = parts;
+  const pids = [...document.querySelectorAll('.post-cb:checked')].map(c=>parseInt(c.value));
+  if(pids.length) body.postulate_ids = pids;
   const r = await api("/api/debates",{method:"POST",body:JSON.stringify(body)});
   $("debateQuestion").value="";
   toast(`▶️ Débat #${r.id} lancé`+(auto?` — auto jusqu'à ${body.consensus_target}% (max ${body.max_rounds} tours)`:" — pas à pas"));

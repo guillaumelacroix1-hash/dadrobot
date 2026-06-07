@@ -8,6 +8,7 @@ l'humain tester dans le réel, puis reprend sur « relancer ».
 from __future__ import annotations
 
 import asyncio
+import json
 import re
 
 from . import db, llm, rag
@@ -133,16 +134,24 @@ FICHE_INSTRUCTION = (
     "Variante à tester au prochain tour."
 )
 
+SYNTHESE_INSTRUCTION = (
+    "Fais la SYNTHÈSE du tour : les points clés, les accords, les désaccords majeurs "
+    "et 2-3 recommandations concrètes et actionnables. Pas de protocole imposé."
+)
+
 
 class StopDebate(Exception):
     pass
 
 
-def shared_frame(question: str) -> str:
+def shared_frame(question: str, objective: str = "", postulate_ids=None) -> str:
     posts = db.list_postulates(active_only=True)
+    if postulate_ids:
+        ids = set(postulate_ids)
+        posts = [p for p in posts if p["id"] in ids]
     lines = "\n".join(f"- {p['text']}" for p in posts) or "- (aucun postulat défini)"
     return (
-        f"OBJECTIF COMMUN (étoile polaire) : {OBJECTIVE}\n\n"
+        f"OBJECTIF COMMUN (étoile polaire) : {objective or OBJECTIVE}\n\n"
         f"POSTULATS ACTIFS (cadre partagé, à garder en tête) :\n{lines}\n\n"
         f"SUJET DE LA SESSION : {question}"
     )
@@ -154,7 +163,10 @@ class DebateRuntime:
                  moderator_selects: bool = True,
                  auto_advance: bool = True,
                  consensus_target: int = 75,
-                 max_rounds: int = 8):
+                 max_rounds: int = 8,
+                 objective: str = "",
+                 postulate_ids=None,
+                 deliverable: str = "protocole"):
         self.debate_id = debate_id
         self.question = question
         self.participants = set(participants) if participants else None
@@ -162,6 +174,9 @@ class DebateRuntime:
         self.auto_advance = auto_advance          # enchaîner les tours jusqu'au consensus
         self.consensus_target = consensus_target  # seuil (%) qui déclenche l'arrêt
         self.max_rounds = max_rounds              # garde-fou : nb de tours max en auto
+        self.objective = objective                # étoile polaire propre à CE débat
+        self.postulate_ids = set(postulate_ids) if postulate_ids else None
+        self.deliverable = deliverable            # protocole | synthese | libre
         self.subscribers: set[asyncio.Queue] = set()
         self.resume_event = asyncio.Event()
         self.resume_event.set()
@@ -225,7 +240,7 @@ class DebateRuntime:
         await self._gate()
         await self.emit({"type": "thinking", "agent": f"{agent.icon} {agent.name}",
                          "phase": phase})
-        user = shared_frame(self.question)
+        user = shared_frame(self.question, self.objective, self.postulate_ids)
         ctx = self.bb.context_block()
         if ctx:
             user += f"\n\nÉTAT DU DÉBAT :\n{ctx}"
@@ -341,9 +356,10 @@ class DebateRuntime:
                                              note="Modérateur · candidate", status="candidate",
                                              context=n["context"])
                             await self.emit({"type": "nugget", "text": n["text"]})
-                if exp:
-                    await self._speak(exp, rnd, "protocole", FICHE_INSTRUCTION,
-                                      use_rag=False)
+                if exp and self.deliverable != "libre":
+                    instr = (FICHE_INSTRUCTION if self.deliverable == "protocole"
+                             else SYNTHESE_INSTRUCTION)
+                    await self._speak(exp, rnd, "protocole", instr, use_rag=False)
                 if avc:
                     await self._speak(avc, rnd, "garde-fou",
                                       "Signale risques, biais et points invérifiables "
@@ -389,10 +405,15 @@ class DebateManager:
 
     def start(self, question: str, participants: list[str] | None = None,
               moderator_selects: bool = True, auto_advance: bool = True,
-              consensus_target: int = 75, max_rounds: int = 8) -> int:
-        debate_id = db.create_debate(question)
+              consensus_target: int = 75, max_rounds: int = 8,
+              objective: str = "", postulate_ids=None,
+              deliverable: str = "protocole") -> int:
+        debate_id = db.create_debate(
+            question, objective,
+            json.dumps(postulate_ids) if postulate_ids else "", deliverable)
         rt = DebateRuntime(debate_id, question, participants, moderator_selects,
-                           auto_advance, consensus_target, max_rounds)
+                           auto_advance, consensus_target, max_rounds,
+                           objective, postulate_ids, deliverable)
         self.runtimes[debate_id] = rt
         rt.task = asyncio.create_task(rt.run())
         return debate_id
@@ -417,7 +438,13 @@ class DebateManager:
         d = db.get_debate(debate_id)
         if not d:
             return False
-        rt = DebateRuntime(debate_id, d["question"])
+        try:
+            pids = json.loads(d.get("postulate_ids") or "") or None
+        except Exception:  # noqa: BLE001
+            pids = None
+        rt = DebateRuntime(debate_id, d["question"],
+                           objective=d.get("objective", ""), postulate_ids=pids,
+                           deliverable=d.get("deliverable", "protocole"))
         self.runtimes[debate_id] = rt
         db.set_debate_status(debate_id, "en cours")
         rt.task = asyncio.create_task(rt.run())

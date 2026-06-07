@@ -123,16 +123,25 @@ def init_db() -> None:
                       "DEFAULT 'epinglee'")  # epinglee / candidate / confirmee / ecartee
         if "context" not in cols:
             c.execute("ALTER TABLE highlights ADD COLUMN context TEXT NOT NULL DEFAULT ''")
+        # Cadre propre à chaque débat : objectif, axiomes choisis, type de livrable.
+        dcols = [r["name"] for r in c.execute("PRAGMA table_info(debates)").fetchall()]
+        if "objective" not in dcols:
+            c.execute("ALTER TABLE debates ADD COLUMN objective TEXT NOT NULL DEFAULT ''")
+        if "postulate_ids" not in dcols:
+            c.execute("ALTER TABLE debates ADD COLUMN postulate_ids TEXT NOT NULL DEFAULT ''")
+        if "deliverable" not in dcols:
+            c.execute("ALTER TABLE debates ADD COLUMN deliverable TEXT NOT NULL DEFAULT 'protocole'")
 
 
 # --------------------------------------------------------------------- débats
-def create_debate(question: str) -> int:
+def create_debate(question: str, objective: str = "", postulate_ids: str = "",
+                  deliverable: str = "protocole") -> int:
     t = now()
     with _conn() as c:
         cur = c.execute(
-            "INSERT INTO debates (question, status, round, created_at, updated_at) "
-            "VALUES (?, 'en cours', 0, ?, ?)",
-            (question, t, t),
+            "INSERT INTO debates (question, status, round, objective, postulate_ids, "
+            "deliverable, created_at, updated_at) VALUES (?, 'en cours', 0, ?, ?, ?, ?, ?)",
+            (question, objective, postulate_ids, deliverable, t, t),
         )
         return int(cur.lastrowid)
 
