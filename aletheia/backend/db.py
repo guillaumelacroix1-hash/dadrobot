@@ -106,6 +106,14 @@ def init_db() -> None:
                 state TEXT,                 -- convergence / blocage / chambre d'écho
                 created_at REAL NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS learnings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                agent_id TEXT NOT NULL,
+                debate_id INTEGER,
+                text TEXT NOT NULL,         -- prises de conscience accumulées par l'agent
+                created_at REAL NOT NULL
+            );
             """
         )
         # Migration douce : statut des pépites (pour les bases déjà créées sans).
@@ -356,3 +364,38 @@ def get_metrics(debate_id: int) -> list[dict[str, Any]]:
             "SELECT * FROM metrics WHERE debate_id=? ORDER BY id", (debate_id,)
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+# --------------------------------------------------------------- apprentissages
+def add_learning(agent_id: str, debate_id: int | None, text: str, cap: int = 6) -> int:
+    with _conn() as c:
+        cur = c.execute(
+            "INSERT INTO learnings (agent_id, debate_id, text, created_at) VALUES (?,?,?,?)",
+            (agent_id, debate_id, text, now()),
+        )
+        # Garde-fou anti-dérive : ne conserve que les `cap` plus récents par agent.
+        c.execute(
+            "DELETE FROM learnings WHERE agent_id=? AND id NOT IN "
+            "(SELECT id FROM learnings WHERE agent_id=? ORDER BY id DESC LIMIT ?)",
+            (agent_id, agent_id, cap),
+        )
+        return int(cur.lastrowid)
+
+
+def list_learnings(agent_id: str, exclude_debate: int | None = None) -> list[dict[str, Any]]:
+    with _conn() as c:
+        if exclude_debate is not None:
+            rows = c.execute(
+                "SELECT * FROM learnings WHERE agent_id=? AND "
+                "(debate_id IS NULL OR debate_id<>?) ORDER BY id", (agent_id, exclude_debate)
+            ).fetchall()
+        else:
+            rows = c.execute(
+                "SELECT * FROM learnings WHERE agent_id=? ORDER BY id", (agent_id,)
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def delete_learnings(agent_id: str) -> None:
+    with _conn() as c:
+        c.execute("DELETE FROM learnings WHERE agent_id=?", (agent_id,))

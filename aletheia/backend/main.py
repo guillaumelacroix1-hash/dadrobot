@@ -12,7 +12,8 @@ from pydantic import BaseModel
 from . import auth, config, db, ingestion, rag
 from .agents import (Agent, delete_agent, load_agent, load_agents, save_agent,
                      update_levers)
-from .orchestrator import OBJECTIVE, explain_highlight, manager
+from .orchestrator import (OBJECTIVE, consolidate_learnings, explain_highlight,
+                           manager)
 
 app = FastAPI(title="Aletheia")
 
@@ -81,7 +82,12 @@ def status():
 # ====================================================================== Agents
 @app.get("/api/agents", dependencies=[Depends(auth.require_auth)])
 def get_agents():
-    return [a.__dict__ for a in load_agents()]
+    out = []
+    for a in load_agents():
+        d = a.__dict__.copy()
+        d["learnings"] = [l["text"] for l in db.list_learnings(a.id)]
+        out.append(d)
+    return out
 
 
 class AgentIn(BaseModel):
@@ -124,6 +130,12 @@ def edit_agent(agent_id: str, changes: dict):
 def remove_agent(agent_id: str):
     if not delete_agent(agent_id):
         raise HTTPException(status_code=404, detail="Agent introuvable")
+    return {"ok": True}
+
+
+@app.delete("/api/agents/{agent_id}/learnings", dependencies=[Depends(auth.require_auth)])
+def reset_learnings(agent_id: str):
+    db.delete_learnings(agent_id)
     return {"ok": True}
 
 
@@ -249,6 +261,14 @@ async def resume_debate(debate_id: int):
 @app.post("/api/debates/{debate_id}/stop", dependencies=[Depends(auth.require_auth)])
 def stop_debate(debate_id: int):
     return {"ok": manager.stop(debate_id)}
+
+
+@app.post("/api/debates/{debate_id}/close", dependencies=[Depends(auth.require_auth)])
+async def close_debate(debate_id: int):
+    """Clôture le débat ET consolide l'apprentissage des agents (mémoire évolutive)."""
+    manager.stop(debate_id)
+    n = await consolidate_learnings(debate_id)
+    return {"ok": True, "learnings": n}
 
 
 class CalibrationIn(BaseModel):

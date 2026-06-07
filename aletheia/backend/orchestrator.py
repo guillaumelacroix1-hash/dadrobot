@@ -84,6 +84,48 @@ async def explain_highlight(text: str, debate_id: int) -> str:
         return ""
 
 
+async def consolidate_learnings(debate_id: int) -> int:
+    """À la clôture d'un débat : chaque praticien en mode apprentissage tire 1-3 prises
+    de conscience (de ses interventions, des critiques, des tests réels) qu'il gardera
+    pour ses prochains débats. Retourne le nombre d'agents mis à jour."""
+    d = db.get_debate(debate_id)
+    turns = db.get_turns(debate_id) if d else []
+    if not turns:
+        return 0
+    logs = db.get_testlogs(debate_id)
+    tlog = "\n".join(f"- {l['text']}" + (f" → {l['outcome']}" if l["outcome"] else "")
+                     for l in logs) or "(aucun retour de test réel)"
+    distil = "\n".join(f"[{t['phase']}] {t['content']}" for t in turns
+                       if t["phase"] in ("convergence", "synthese"))[:2500]
+    agents = {a.id: a for a in load_agents()}
+    participated = {t["agent_id"] for t in turns}
+    count = 0
+    for aid in participated:
+        a = agents.get(aid)
+        if not a or a.role != "praticien" or not getattr(a, "learning", True):
+            continue
+        mine = "\n".join(f"[{t['phase']}] {t['content']}" for t in turns
+                         if t["agent_id"] == aid)[:2500]
+        system = a.persona or f"Tu es {a.name}, spécialiste de {a.domain}."
+        user = (f"DÉBAT QUI S'ACHÈVE : {d['question']}\n\n"
+                f"DISTILLATION (convergence / synthèse) :\n{distil or '(n/d)'}\n\n"
+                f"TES PROPRES INTERVENTIONS :\n{mine or '(n/d)'}\n\n"
+                f"RETOURS DE TESTS RÉELS DE L'HUMAIN (priment sur la théorie) :\n{tlog}\n\n"
+                "Formule 1 à 3 PRISES DE CONSCIENCE concises (une phrase chacune, en puces) "
+                "que tu retiens pour tes PROCHAINS débats : ce qui a affiné ou changé ta "
+                "compréhension, au vu des critiques et surtout des tests réels. Pas de "
+                "préambule — uniquement les puces.")
+        try:
+            txt = (await llm.chat(a.provider, a.model, system, user,
+                                  temperature=0.5, max_tokens=240)).strip()
+        except Exception:  # noqa: BLE001
+            continue
+        if txt:
+            db.add_learning(aid, debate_id, txt)
+            count += 1
+    return count
+
+
 FICHE_INSTRUCTION = (
     "Transforme la meilleure piste en FICHE PROTOCOLE testable, avec ces sections : "
     "Nom · Objectif visé · Matériel · Durée · Déroulé pas-à-pas · "
@@ -205,6 +247,12 @@ class DebateRuntime:
                 "est établi de ce qui est spéculatif, mais propose des pistes même non prouvées "
                 "— l'absence de preuve publique ne vaut pas preuve du contraire. Sois à la fois "
                 "audacieux et rigoureux.")
+            if getattr(agent, "learning", True):
+                learns = db.list_learnings(agent.id, exclude_debate=self.debate_id)
+                if learns:
+                    mem = "\n".join(l["text"] for l in learns)
+                    system += ("\n\nTES PRISES DE CONSCIENCE DES DÉBATS PRÉCÉDENTS (acquis à "
+                               f"intégrer, fruit de ton expérience passée) :\n{mem}")
         try:
             content = await llm.chat(agent.provider, agent.model, system, user,
                                      agent.temperature, agent.top_p)

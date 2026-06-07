@@ -119,6 +119,7 @@
               <button id="btnResume" onclick="ctrl('resume')" title="Relancer / reprendre" class="px-2 py-1 rounded bg-emerald-600/80 hover:bg-emerald-500 text-xs">▶️ Relancer</button>
               <button id="btnCalibrate" onclick="openCalibrate()" title="Calibrer" class="px-2 py-1 rounded bg-cyan-600/80 hover:bg-cyan-500 text-xs">🎛️</button>
               <button id="btnStop" onclick="ctrl('stop')" title="Arrêter définitivement" class="px-2 py-1 rounded bg-red-600/80 hover:bg-red-500 text-xs">⏹️</button>
+              <button id="btnClose" onclick="closeDebate()" title="Clôturer et consolider l'apprentissage des agents" class="px-2 py-1 rounded bg-indigo-600/80 hover:bg-indigo-500 text-xs">📚 Clôturer</button>
             </div>
           </div>
         </div>
@@ -535,6 +536,16 @@ async function ctrl(action){
     const d=await api("/api/debates/"+currentDebate); applyStatus(d.debate.status); loadDebates();
   }catch(e){ toast("Erreur : "+e.message,"err"); }
 }
+async function closeDebate(){
+  if(!currentDebate) return;
+  if(!confirm("Clôturer ce débat et consolider l'apprentissage des agents ? (peut prendre un moment)")) return;
+  toast("📚 Consolidation de l'apprentissage en cours…");
+  try{
+    const r=await api(`/api/debates/${currentDebate}/close`,{method:"POST"});
+    toast(`📚 ${r.learnings} agent(s) ont consolidé leur apprentissage`);
+    const d=await api("/api/debates/"+currentDebate); applyStatus(d.debate.status); loadDebates();
+  }catch(e){ toast("Erreur : "+e.message,"err"); }
+}
 
 // -------- Sélection → épingler une phrase --------
 let selData=null;
@@ -601,6 +612,15 @@ async function loadAgents(){
       <details class="text-xs" ${a.orientation?"open":""}><summary class="cursor-pointer text-yellow-500">🧭 Orientation (perso)</summary>
         <textarea onchange="saveLever('${a.id}','orientation',this.value)" rows="2" placeholder="Oriente (ou désoriente) cet agent : un angle, un biais voulu, une contrainte…" class="w-full bg-slate-900 border border-yellow-700/40 rounded p-2 mt-1">${escapeHtml(a.orientation||"")}</textarea>
       </details>
+      ${a.role==='praticien'?`
+      <label class="flex items-center gap-2 text-xs pt-1">
+        <input type="checkbox" ${a.learning!==false?"checked":""} onchange="saveLever('${a.id}','learning',this.checked)" class="accent-emerald-500"/>
+        📚 Apprentissage <span class="text-slate-600">(mémoire évolutive)</span>
+      </label>
+      ${(a.learnings&&a.learnings.length)?`<details class="text-xs"><summary class="cursor-pointer text-slate-500">🧠 ${a.learnings.length} prise(s) de conscience</summary>
+        <div class="mt-1 space-y-1">${a.learnings.map(l=>`<div class="bg-slate-900 rounded p-1.5 text-slate-400 whitespace-pre-wrap">${escapeHtml(l)}</div>`).join("")}</div>
+        <button onclick="resetLearnings('${a.id}')" class="text-[10px] text-red-400 hover:text-red-300 mt-1">Effacer la mémoire</button>
+      </details>`:`<p class="text-[10px] text-slate-600">Aucun apprentissage pour l'instant.</p>`}`:""}
       <button onclick="delAgent('${a.id}')" class="text-xs text-red-400 hover:text-red-300">Supprimer</button>
     </div>`).join("");
 }
@@ -619,6 +639,7 @@ async function createAgent(){
   catch(e){ alert(e.message); }
 }
 async function delAgent(id){ if(confirm("Supprimer cet agent ?")){ await api("/api/agents/"+id,{method:"DELETE"}); loadAgents(); toast("Agent supprimé"); } }
+async function resetLearnings(id){ if(confirm("Effacer toute la mémoire (apprentissages) de cet agent ?")){ await api("/api/agents/"+id+"/learnings",{method:"DELETE"}); loadAgents(); toast("🧠 Mémoire effacée"); } }
 
 // -------- Sources --------
 function fillAgentSelect(){
