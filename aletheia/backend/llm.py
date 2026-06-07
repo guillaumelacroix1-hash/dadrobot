@@ -67,6 +67,7 @@ async def chat(
     temperature: float = 0.7,
     top_p: float = 0.95,
     max_tokens: int = 1200,
+    web: bool = False,
 ) -> str:
     provider = (provider or "openrouter").lower()
     try:
@@ -77,10 +78,10 @@ async def chat(
                 GROQ_URL, config.GROQ_API_KEY, model, system, user,
                 temperature, top_p, max_tokens,
             )
-        # défaut : openrouter
+        # défaut : openrouter (seul à supporter le plugin de recherche web)
         return await _openai_compat(
             OPENROUTER_URL, config.OPENROUTER_API_KEY, model, system, user,
-            temperature, top_p, max_tokens,
+            temperature, top_p, max_tokens, web=web,
             extra_headers={
                 "HTTP-Referer": "https://github.com/guillaumelacroix1-hash/dadrobot",
                 "X-Title": "Aletheia",
@@ -97,7 +98,7 @@ async def chat(
 async def _openai_compat(
     url: str, api_key: str, model: str, system: str, user: str,
     temperature: float, top_p: float, max_tokens: int,
-    extra_headers: dict | None = None,
+    extra_headers: dict | None = None, web: bool = False,
 ) -> str:
     if not api_key:
         raise LLMError(f"clé API manquante pour {url.split('/')[2]}")
@@ -117,7 +118,9 @@ async def _openai_compat(
         "top_p": top_p,
         "max_tokens": max_tokens,
     }
-    async with httpx.AsyncClient(timeout=120) as client:
+    if web:  # plugin de recherche web OpenRouter (résultats frais injectés au prompt)
+        payload["plugins"] = [{"id": "web", "max_results": 3}]
+    async with httpx.AsyncClient(timeout=180 if web else 120) as client:
         r = await _post_retry(client, url, headers, payload)
         r.raise_for_status()
         data = r.json()

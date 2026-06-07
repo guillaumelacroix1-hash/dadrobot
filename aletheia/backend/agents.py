@@ -29,6 +29,7 @@ class Agent:
     orientation: str = ""            # consigne perso (orienter/désorienter) injectée pour CET agent
     order: int = 100                 # ordre de prise de parole
     learning: bool = True            # mémoire évolutive : apprend des débats passés
+    web: bool = False                # accès recherche web (OpenRouter) pour cet agent
 
     @property
     def sources_dir(self):
@@ -76,7 +77,7 @@ def update_levers(agent_id: str, changes: dict[str, Any]) -> Agent | None:
         return None
     allowed = {"name", "icon", "provider", "model", "temperature", "top_p",
                "max_context", "domain", "persona", "orientation", "order", "role",
-               "learning"}
+               "learning", "web"}
     for k, v in changes.items():
         if k in allowed:
             setattr(agent, k, v)

@@ -276,7 +276,8 @@ class DebateRuntime:
                                f"intégrer, fruit de ton expérience passée) :\n{mem}")
         try:
             content = await llm.chat(agent.provider, agent.model, system, user,
-                                     agent.temperature, agent.top_p)
+                                     agent.temperature, agent.top_p,
+                                     web=getattr(agent, "web", False))
         except llm.LLMError as e:
             content = f"⚠️ Modèle indisponible ({agent.name}) : {e}"
         return await self.emit_turn(rnd, phase, agent, content)

@@ -751,6 +751,10 @@ async function loadAgents(){
         <input type="checkbox" ${a.learning!==false?"checked":""} onchange="saveLever('${a.id}','learning',this.checked)" class="accent-emerald-500"/>
         📚 Apprentissage <span class="text-slate-600">(mémoire évolutive)</span>
       </label>
+      <label class="flex items-center gap-2 text-xs">
+        <input type="checkbox" ${a.web?"checked":""} onchange="saveLever('${a.id}','web',this.checked)" class="accent-emerald-500"/>
+        🌐 Accès web <span class="text-slate-600">(recherche en direct · +coût/latence)</span>
+      </label>
       ${(a.learnings&&a.learnings.length)?`<details class="text-xs"><summary class="cursor-pointer text-slate-500">🧠 ${a.learnings.length} prise(s) de conscience</summary>
         <div class="mt-1 space-y-1">${a.learnings.map(l=>`<div class="bg-slate-900 rounded p-1.5 text-slate-400 whitespace-pre-wrap">${escapeHtml(l)}</div>`).join("")}</div>
         <button onclick="resetLearnings('${a.id}')" class="text-[10px] text-red-400 hover:text-red-300 mt-1">Effacer la mémoire</button>
