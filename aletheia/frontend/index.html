@@ -201,7 +201,8 @@
             </select>
             <input id="interveneText" placeholder="Interviens dans le débat (ton ressenti, une piste, un fait…)" class="flex-1 bg-slate-900 border border-slate-700 rounded p-2 text-xs"
               onkeydown="if(event.key==='Enter')sendIntervene()"/>
-            <button onclick="sendIntervene()" class="bg-yellow-600 hover:bg-yellow-500 rounded px-3 text-xs">Envoyer</button>
+            <button onclick="sendIntervene()" class="bg-yellow-600 hover:bg-yellow-500 rounded px-3 text-xs" title="Ajouter sans relancer">Envoyer</button>
+            <button onclick="interveneAndResume()" class="bg-emerald-600 hover:bg-emerald-500 rounded px-3 text-xs whitespace-nowrap" title="Ajouter mon intervention ET relancer le débat">💬 + Relancer</button>
           </div>
           <p class="text-[10px] text-slate-500 mt-1">Ton message sera lu par les agents au tour suivant.</p>
           <div class="flex gap-2 mt-2">
@@ -614,6 +615,17 @@ async function sendIntervene(){
   const text=$("interveneText").value.trim(); if(!text||!currentDebate) return;
   await api(`/api/debates/${currentDebate}/intervene`,{method:"POST",body:JSON.stringify({text,kind:$("interveneKind").value})});
   $("interveneText").value=""; toast("🫀 Intervention transmise");
+}
+async function interveneAndResume(){
+  if(!currentDebate) return;
+  const text=$("interveneText").value.trim();
+  if(text){
+    try{
+      await api(`/api/debates/${currentDebate}/intervene`,{method:"POST",body:JSON.stringify({text,kind:$("interveneKind").value})});
+      $("interveneText").value=""; toast("💬 Intervention ajoutée (lue au prochain tour)");
+    }catch(e){ toast("Erreur : "+e.message,"err"); return; }
+  }
+  await ctrl('resume');
 }
 function renderNote(txt){
   const el=document.createElement("div");

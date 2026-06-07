@@ -55,16 +55,17 @@ def parse_nuggets(text: str) -> list[dict]:
     """Lit les pépites candidates (+ leur contexte) proposées à la convergence."""
     out, cur = [], None
     for line in (text or "").splitlines():
-        m = re.match(r"\s*P[ÉE]PITE\s+CANDIDATE\s*[:=]\s*(.+)", line, re.IGNORECASE)
+        # tolère le markdown en tête (**, -, #, >, 1.) et après le mot-clé (:**, etc.)
+        m = re.match(r"^[\s>*_\-#0-9.)]*P[ÉE]PITE\s+CANDIDATE\s*[:=*]*\s*(.+)", line, re.IGNORECASE)
         if m:
             if cur:
                 out.append(cur)
-            cur = {"text": m.group(1).strip(" *-—:").strip(), "context": ""}
+            cur = {"text": m.group(1).strip(" *_-—:"), "context": ""}
             continue
         if cur is not None:
-            cm = re.match(r"\s*CONTEXTE\s*[:=]\s*(.+)", line, re.IGNORECASE)
+            cm = re.match(r"^[\s>*_\-#]*CONTEXTE\s*[:=*]*\s*(.+)", line, re.IGNORECASE)
             if cm:
-                cur["context"] = cm.group(1).strip(" *-—:").strip()
+                cur["context"] = cm.group(1).strip(" *_-—:")
     if cur:
         out.append(cur)
     return [n for n in out if n["text"]][:3]
