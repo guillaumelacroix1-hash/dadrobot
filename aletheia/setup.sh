@@ -70,7 +70,7 @@ sleep 2
 systemctl restart aletheia
 
 echo "==> [6/6] Vérification"
-IP="$(curl -fsS https://ifconfig.me 2>/dev/null || echo TON_IP_VPS)"
+IP="$(curl -4 -fsS https://ifconfig.me 2>/dev/null || echo TON_IP_VPS)"
 echo
 echo "======================================================"
 echo "  ✅ Aletheia est installé et lancé."
