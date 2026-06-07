@@ -280,6 +280,16 @@ async def close_debate(debate_id: int):
     return {"ok": True, "learnings": n}
 
 
+class RenameIn(BaseModel):
+    title: str
+
+
+@app.post("/api/debates/{debate_id}/rename", dependencies=[Depends(auth.require_auth)])
+def rename_debate(debate_id: int, body: RenameIn):
+    db.set_debate_title(debate_id, body.title)
+    return {"ok": True}
+
+
 class CalibrationIn(BaseModel):
     note: str
     payload: dict | None = None

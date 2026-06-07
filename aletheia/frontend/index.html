@@ -171,7 +171,11 @@
                 <span>tour <span id="liveRound">0</span></span>
                 <span id="consensusBadge" class="hidden px-1.5 py-0.5 rounded text-[10px]"></span>
               </div>
-              <p id="liveQuestion" class="text-sm font-medium mt-1 max-h-20 overflow-y-auto pr-1"></p>
+              <div class="flex items-center gap-2 mt-1">
+                <span id="liveTitle" class="text-sm font-semibold text-slate-100 truncate"></span>
+                <button onclick="renameDebate(currentDebate)" title="Renommer ce débat" class="text-xs text-slate-500 hover:text-emerald-400 shrink-0">✏️</button>
+              </div>
+              <p id="liveQuestion" class="text-xs text-slate-400 mt-0.5 max-h-16 overflow-y-auto pr-1"></p>
             </div>
             <div class="flex items-center gap-1 shrink-0">
               <div class="flex items-center mr-1 rounded bg-slate-900/70 border border-slate-700">
@@ -461,7 +465,7 @@ async function loadDebates(){
     const sel = d.id===currentDebate ? "ring-1 ring-emerald-500/60" : "";
     return `<div onclick="openDebate(${d.id})" class="cursor-pointer p-2 rounded-lg bg-slate-900 hover:bg-slate-700 ${sel}">
       <div class="flex justify-between items-center"><span class="font-medium">${dot} #${d.id}</span><span class="text-xs text-slate-500">${d.status}</span></div>
-      <p class="text-xs text-slate-400 truncate">${escapeHtml(d.question)}</p>
+      <p class="text-xs text-slate-400 truncate">${escapeHtml(d.title || d.question)}</p>
     </div>`;
   }).join("") || '<p class="text-slate-500">Aucun débat.</p>';
 }
@@ -487,6 +491,15 @@ async function startDebate(){
   toast(`▶️ Débat #${r.id} lancé`+(auto?` — auto jusqu'à ${body.consensus_target}% (max ${body.max_rounds} tours)`:" — pas à pas"));
   await loadDebates(); openDebate(r.id);
 }
+async function renameDebate(id){
+  if(!id) return;
+  const cur = ($("liveTitle").textContent||"").replace(/^Débat #\d+$/,"");
+  const title = prompt("Nom du débat :", cur);
+  if(title===null) return;
+  await api(`/api/debates/${id}/rename`,{method:"POST",body:JSON.stringify({title:title.trim()})});
+  $("liveTitle").textContent = title.trim() || ("Débat #"+id);
+  loadDebates(); toast("✏️ Débat renommé");
+}
 async function openDebate(id){
   currentDebate = id;
   const d = await api("/api/debates/"+id);
@@ -494,6 +507,7 @@ async function openDebate(id){
   $("humanBox").classList.remove("hidden");
   $("planCard").classList.remove("hidden");
   $("liveId").textContent = id;
+  $("liveTitle").textContent = d.debate.title || ("Débat #"+id);
   $("liveQuestion").textContent = d.debate.question;
   $("liveRound").textContent = d.debate.round;
   $("liveFeed").innerHTML = "";

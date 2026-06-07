@@ -131,6 +131,8 @@ def init_db() -> None:
             c.execute("ALTER TABLE debates ADD COLUMN postulate_ids TEXT NOT NULL DEFAULT ''")
         if "deliverable" not in dcols:
             c.execute("ALTER TABLE debates ADD COLUMN deliverable TEXT NOT NULL DEFAULT 'protocole'")
+        if "title" not in dcols:
+            c.execute("ALTER TABLE debates ADD COLUMN title TEXT NOT NULL DEFAULT ''")
 
 
 # --------------------------------------------------------------------- débats
@@ -152,6 +154,12 @@ def set_debate_status(debate_id: int, status: str) -> None:
             "UPDATE debates SET status=?, updated_at=? WHERE id=?",
             (status, now(), debate_id),
         )
+
+
+def set_debate_title(debate_id: int, title: str) -> None:
+    with _conn() as c:
+        c.execute("UPDATE debates SET title=?, updated_at=? WHERE id=?",
+                  (title, now(), debate_id))
 
 
 def mark_stale_running_paused() -> int:
