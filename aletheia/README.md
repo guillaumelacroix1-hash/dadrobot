@@ -8,10 +8,14 @@ commun pour produire des **idées concrètes, testables dans le réel**.
 ## Ce que ça fait
 
 - **8 praticiens** (Hypnose, Lumière, Résonance/Ondes, Géométrie sacrée, Mythologie,
-  Spiritualité, Mathématiques, Médiumnité) + **3 agents de processus** (Modérateur,
-  Expérimentateur, Avocat du diable).
-- **Débat piloté en temps réel** : stop / pause / **calibrage** / reprise. À la fin de
-  chaque tour, l'Expérimentateur produit une **Fiche Protocole** à tester dans le réel.
+  Spiritualité, Mathématiques, Médiumnité) + **4 agents de processus** (Modérateur,
+  Expérimentateur, Avocat du diable, Synthétiseur de cycle).
+- **Débat piloté en temps réel** : stop / pause / **calibrage** / reprise, **sélection
+  dynamique des intervenants**, **score de consensus** (alerte chambre d'écho), et tous
+  les 3 tours une **synthèse de cycle** (la version la plus aboutie). À chaque tour,
+  l'Expérimentateur produit une **Fiche Protocole** à tester dans le réel.
+- **Humain dans la boucle** : intervention en direct + **journal de tes tests réels** qui
+  nourrit le tour suivant. Orientation propre à chaque agent. Pépites (⭐) et sorties.
 - **Base de connaissances vivante et multi-source** par agent : texte, PDF/livre, page
   web, **YouTube** (transcription auto), audio/vidéo (Whisper via Groq). Enrichissable
   **à chaud**, même en plein débat.

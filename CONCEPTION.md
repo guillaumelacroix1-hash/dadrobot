@@ -334,3 +334,19 @@ Le débat multi-agents entre LLM est un champ actif. Ce qu'on en retient et appl
 > Pistes proposées pour la suite (à valider) : tour de parole dynamique façon AutoGen ·
 > score de consensus + rejeu de session · upload multi-fichiers en glisser-déposer ·
 > export d'une Fiche Protocole en PDF · journal de tes tests réels rattaché à chaque débat.
+
+## 11. Itération 2 — implémentée
+
+- **Journal de tests réels** : on note ce qu'on a observé en testant un protocole ; ces
+  retours sont injectés dans le débat et **priment sur la théorie** au tour suivant
+  (boucle matière↔débat fermée).
+- **Synthétiseur de cycle** (4ᵉ agent de processus) : tous les 3 tours, il propose **la
+  version la plus aboutie** de la technique à ce stade.
+- **Débat plus intelligent** : le Modérateur **sélectionne dynamiquement** les 3-6
+  praticiens pertinents pour chaque tour (façon GroupChatManager), et publie un **score
+  de consensus 0-100** avec un état (convergence / blocage / **chambre d'écho**) — alerte
+  visuelle quand le cercle s'enferme.
+- **Déploiement** : `render.yaml` à la racine + `aletheia/DEPLOY.md` (guide pas-à-pas).
+  Build léger par défaut (index mot-clé ; ChromaDB optionnel).
+
+> Cénacle désormais : **8 praticiens + 4 agents de processus = 12 agents.**

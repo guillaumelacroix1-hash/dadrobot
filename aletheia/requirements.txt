@@ -8,8 +8,11 @@ itsdangerous>=2.1
 python-multipart>=0.0.9
 
 # --- Base de connaissances (RAG) ---
-# Chroma fonctionne sur CPU (embeddings par défaut), pas de GPU requis.
-chromadb>=0.5
+# Par défaut, Aletheia utilise un index mot-clé léger (aucune dépendance lourde),
+# parfait pour un premier déploiement sur petite instance.
+# Pour une recherche SÉMANTIQUE plus fine, décommente ChromaDB (instance ≥ 1 Go
+# recommandée). Le code bascule automatiquement dessus s'il est installé.
+# chromadb>=0.5
 
 # --- Ingestion multi-source (optionnel mais recommandé) ---
 pypdf>=4.0                 # livres / PDF

@@ -222,7 +222,9 @@ def debate_detail(debate_id: int):
     if not d:
         raise HTTPException(status_code=404, detail="Débat introuvable")
     return {"debate": d, "turns": db.get_turns(debate_id),
-            "calibrations": db.get_calibrations(debate_id)}
+            "calibrations": db.get_calibrations(debate_id),
+            "test_logs": db.get_testlogs(debate_id),
+            "metrics": db.get_metrics(debate_id)}
 
 
 @app.post("/api/debates/{debate_id}/pause", dependencies=[Depends(auth.require_auth)])
@@ -259,6 +261,22 @@ class InterveneIn(BaseModel):
 @app.post("/api/debates/{debate_id}/intervene", dependencies=[Depends(auth.require_auth)])
 async def intervene(debate_id: int, body: InterveneIn):
     return await manager.intervene(debate_id, body.text, body.kind)
+
+
+class TestLogIn(BaseModel):
+    text: str
+    outcome: str = ""
+
+
+@app.post("/api/debates/{debate_id}/testlog", dependencies=[Depends(auth.require_auth)])
+async def add_testlog(debate_id: int, body: TestLogIn):
+    """Journal de tests réels : ce que l'humain a observé en testant un protocole."""
+    rnd = (db.get_debate(debate_id) or {}).get("round", 0)
+    db.add_testlog(debate_id, rnd, body.text, body.outcome)
+    # Visible aussi dans le fil + lu par les agents au tour suivant.
+    return await manager.intervene(
+        debate_id, f"[TEST RÉEL] {body.text}" + (f" → {body.outcome}" if body.outcome else ""),
+        "source")
 
 
 # ============================================== Pépites / sorties des débats

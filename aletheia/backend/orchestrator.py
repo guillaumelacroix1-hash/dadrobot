@@ -8,6 +8,7 @@ l'humain tester dans le réel, puis reprend sur « relancer ».
 from __future__ import annotations
 
 import asyncio
+import re
 
 from . import db, llm, rag
 from .agents import load_agents, praticiens, process_agent
@@ -17,6 +18,34 @@ OBJECTIVE = (
     "Comment éveiller le plein potentiel humain — perception, conscience, "
     "capacités latentes — sans présupposer la forme du résultat ?"
 )
+
+# Tous les N tours, le Synthétiseur propose la version la plus aboutie.
+CYCLE = 3
+
+
+def parse_agent_selection(text: str, all_prats: list) -> list:
+    """Lit la ligne 'AGENTS À SOLLICITER : id1, id2…' du cadrage. Repli : tous."""
+    ids = {a.id for a in all_prats}
+    m = re.search(r"AGENTS? À SOLLICITER\s*[:=]\s*(.+)", text or "", re.IGNORECASE)
+    if not m:
+        return all_prats
+    chosen = {tok.strip().lower() for tok in re.split(r"[,;/]| et ", m.group(1))}
+    picked = [a for a in all_prats if a.id in (ids & chosen)]
+    return picked if len(picked) >= 3 else all_prats
+
+
+def parse_consensus(text: str) -> tuple[int | None, str]:
+    """Lit la ligne 'CONSENSUS: NN/100 (état: …)' de la convergence."""
+    score = None
+    m = re.search(r"CONSENSUS\s*[:=]\s*(\d{1,3})", text or "", re.IGNORECASE)
+    if m:
+        score = max(0, min(100, int(m.group(1))))
+    state = ""
+    for kw in ("chambre d'écho", "chambre d'echo", "blocage", "convergence"):
+        if kw in (text or "").lower():
+            state = "chambre d'écho" if "cho" in kw else kw
+            break
+    return score, state
 
 FICHE_INSTRUCTION = (
     "Transforme la meilleure piste en FICHE PROTOCOLE testable, avec ces sections : "
@@ -94,7 +123,16 @@ class DebateRuntime:
         self.resume_event.set()
 
     # ------------------------------------------------------------ prise de parole
-    async def _speak(self, agent, rnd, phase, instruction, use_rag=True) -> None:
+    def _testlog_block(self) -> str:
+        logs = db.get_testlogs(self.debate_id)
+        if not logs:
+            return ""
+        lines = [f"- {l['text']}" + (f" → {l['outcome']}" if l["outcome"] else "")
+                 for l in logs[-5:]]
+        return ("RETOURS DE TESTS RÉELS DE L'HUMAIN (à prendre au sérieux, ils priment "
+                "sur la théorie) :\n" + "\n".join(lines))
+
+    async def _speak(self, agent, rnd, phase, instruction, use_rag=True) -> dict | None:
         await self._gate()
         await self.emit({"type": "thinking", "agent": f"{agent.icon} {agent.name}",
                          "phase": phase})
@@ -102,6 +140,9 @@ class DebateRuntime:
         ctx = self.bb.context_block()
         if ctx:
             user += f"\n\nÉTAT DU DÉBAT :\n{ctx}"
+        tlog = self._testlog_block()
+        if tlog:
+            user += f"\n\n{tlog}"
         if use_rag and agent.role == "praticien":
             rag_ctx = rag.context_for(agent.id, self.question)
             if rag_ctx:
@@ -120,7 +161,7 @@ class DebateRuntime:
                                      agent.temperature, agent.top_p)
         except llm.LLMError as e:
             content = f"⚠️ Modèle indisponible ({agent.name}) : {e}"
-        await self.emit_turn(rnd, phase, agent, content)
+        return await self.emit_turn(rnd, phase, agent, content)
 
     # ----------------------------------------------------------------- run
     async def run(self) -> None:
@@ -131,16 +172,26 @@ class DebateRuntime:
                 await self.emit({"type": "round_start", "round": rnd})
 
                 agents = load_agents()
-                prats = praticiens(agents)
+                all_prats = praticiens(agents)
                 mod = process_agent(agents, "moderateur")
                 exp = process_agent(agents, "experimentateur")
                 avc = process_agent(agents, "avocat_du_diable")
+                syn = process_agent(agents, "synthetiseur")
 
+                # Cadrage + sélection dynamique des intervenants (façon GroupChatManager).
+                prats = all_prats
                 if mod:
-                    await self._speak(mod, rnd, "cadrage",
-                                      "Ouvre la session : rappelle l'objectif et les "
-                                      "postulats, puis formule la sous-question du tour "
-                                      "(4-6 lignes).", use_rag=False)
+                    ids = ", ".join(a.id for a in all_prats)
+                    cadre = await self._speak(
+                        mod, rnd, "cadrage",
+                        "Ouvre la session : rappelle l'objectif et les postulats, puis "
+                        "formule la sous-question du tour (4-6 lignes). Termine par une "
+                        f"ligne « AGENTS À SOLLICITER : … » en choisissant parmi [{ids}] "
+                        "les 3 à 6 praticiens les plus pertinents pour CE tour (garde de "
+                        "la diversité de points de vue).", use_rag=False)
+                    if rnd > 1 and cadre:
+                        prats = parse_agent_selection(cadre["content"], all_prats)
+
                 for a in prats:
                     await self._speak(a, rnd, "position",
                                       "Donne ta position depuis ta spécialité sur la "
@@ -152,12 +203,19 @@ class DebateRuntime:
                                       "majorité par confort : si tu n'es pas convaincu, "
                                       "dis-le et défends ta position de minorité. Concis.")
                 if mod:
-                    await self._speak(mod, rnd, "convergence",
-                                      "Extrais les 2-3 pistes les plus prometteuses du "
-                                      "tour (numérote-les). Ajoute une ligne RAPPORT "
-                                      "MINORITAIRE : les avis dissidents qui méritent "
-                                      "d'être gardés, même s'ils ne font pas consensus.",
-                                      use_rag=False)
+                    conv = await self._speak(
+                        mod, rnd, "convergence",
+                        "Extrais les 2-3 pistes les plus prometteuses du tour "
+                        "(numérote-les). Ajoute une ligne RAPPORT MINORITAIRE (avis "
+                        "dissidents à garder). Termine par une ligne "
+                        "« CONSENSUS : NN/100 (état: convergence | blocage | chambre "
+                        "d'écho) » évaluant honnêtement où en est le cercle.",
+                        use_rag=False)
+                    if conv:
+                        score, state = parse_consensus(conv["content"])
+                        db.add_metric(self.debate_id, rnd, score, state)
+                        await self.emit({"type": "consensus", "round": rnd,
+                                         "consensus": score, "state": state})
                 if exp:
                     await self._speak(exp, rnd, "protocole", FICHE_INSTRUCTION,
                                       use_rag=False)
@@ -166,6 +224,16 @@ class DebateRuntime:
                                       "Signale risques, biais et points invérifiables "
                                       "des pistes et du protocole. Bref et franc.",
                                       use_rag=False)
+
+                # Synthèse de cycle : tous les CYCLE tours, la meilleure version à ce jour.
+                if syn and rnd % CYCLE == 0:
+                    await self._speak(
+                        syn, rnd, "synthese",
+                        "Relis l'ensemble du débat (résumé + tours récents + retours de "
+                        "tests) et propose LA VERSION LA PLUS ABOUTIE de la technique à "
+                        "ce stade : un protocole unique, intégré et concret, qui combine "
+                        "le meilleur de toutes les pistes. Mentionne ce qu'il reste à "
+                        "valider.", use_rag=False)
 
                 await self.bb.refresh_summary()
                 await self.emit({"type": "round_done", "round": rnd})

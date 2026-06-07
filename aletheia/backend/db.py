@@ -88,6 +88,24 @@ def init_db() -> None:
                 note TEXT,
                 created_at REAL NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS test_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                debate_id INTEGER NOT NULL,
+                round INTEGER NOT NULL,
+                text TEXT NOT NULL,
+                outcome TEXT,               -- ressenti / résultat observé
+                created_at REAL NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS metrics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                debate_id INTEGER NOT NULL,
+                round INTEGER NOT NULL,
+                consensus INTEGER,          -- 0..100
+                state TEXT,                 -- convergence / blocage / chambre d'écho
+                created_at REAL NOT NULL
+            );
             """
         )
 
@@ -286,5 +304,42 @@ def list_protocols() -> list[dict[str, Any]]:
             "SELECT t.*, d.question AS debate_question FROM turns t "
             "JOIN debates d ON d.id = t.debate_id "
             "WHERE t.phase='protocole' ORDER BY t.created_at DESC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+# --------------------------------------------------- journal de tests réels
+def add_testlog(debate_id: int, rnd: int, text: str, outcome: str = "") -> int:
+    with _conn() as c:
+        cur = c.execute(
+            "INSERT INTO test_logs (debate_id, round, text, outcome, created_at) "
+            "VALUES (?,?,?,?,?)",
+            (debate_id, rnd, text, outcome, now()),
+        )
+        return int(cur.lastrowid)
+
+
+def get_testlogs(debate_id: int) -> list[dict[str, Any]]:
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT * FROM test_logs WHERE debate_id=? ORDER BY id", (debate_id,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+# ---------------------------------------------------------------- métriques
+def add_metric(debate_id: int, rnd: int, consensus: int | None, state: str) -> None:
+    with _conn() as c:
+        c.execute(
+            "INSERT INTO metrics (debate_id, round, consensus, state, created_at) "
+            "VALUES (?,?,?,?,?)",
+            (debate_id, rnd, consensus, state, now()),
+        )
+
+
+def get_metrics(debate_id: int) -> list[dict[str, Any]]:
+    with _conn() as c:
+        rows = c.execute(
+            "SELECT * FROM metrics WHERE debate_id=? ORDER BY id", (debate_id,)
         ).fetchall()
         return [dict(r) for r in rows]
