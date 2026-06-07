@@ -50,6 +50,18 @@
     .round-sep::before,.round-sep::after{content:"";flex:1;height:1px;background:#334155}
     /* Petit point de couleur d'agent pour repérage rapide */
     .turn-block{scroll-margin-top:8px}
+
+    /* Scrollbars élégantes, dans le ton (Firefox) */
+    *{scrollbar-width:thin;scrollbar-color:#3a4a5e transparent}
+    /* Scrollbars élégantes (WebKit : Chrome/Edge/Safari) */
+    ::-webkit-scrollbar{width:10px;height:10px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{
+      background:#334155;border-radius:9999px;
+      border:2px solid transparent;background-clip:padding-box;
+    }
+    ::-webkit-scrollbar-thumb:hover{background:#4b6079}
+    ::-webkit-scrollbar-corner{background:transparent}
   </style>
 </head>
 <body class="min-h-screen bg-slate-900 text-slate-100 font-sans">
