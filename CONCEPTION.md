@@ -280,5 +280,12 @@ Chaque fichier `agents/*.yaml` expose les réglages modifiables :
 7. **Déploiement** sur le serveur géré (cible Render) + mise en ligne accessible 24h/24.
 8. Première session de test sur l'étoile polaire.
 
-> État actuel : **plan verrouillé, document de référence écrit.** Prochaine étape sur
-> validation : passage au squelette de code (étape 1).
+> **État actuel : squelette construit et fonctionnel (étapes 1→7).** Le code est dans
+> `aletheia/` : backend FastAPI (débat + pilotage + RAG + ingestion multi-source +
+> postulats + auth), 11 agents, tableau de bord web, fichiers de déploiement Render.
+> Le serveur démarre, sert le tableau de bord, et répond sans clés (les agents signalent
+> « modèle indisponible » tant que les clés ne sont pas renseignées).
+>
+> **Prochaines étapes** : renseigner les clés API et lancer une première vraie session
+> (étape 8), puis déployer sur Render. Améliorations prévues : reprise d'un débat après
+> redémarrage du serveur, transcription audio/vidéo testée de bout en bout.

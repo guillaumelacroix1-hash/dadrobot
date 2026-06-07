@@ -1,0 +1,28 @@
+# Déploiement sur Render (https://render.com)
+# Crée un service à partir de ce dépôt : Render lit ce fichier automatiquement.
+services:
+  - type: web
+    name: aletheia
+    runtime: python
+    rootDir: aletheia
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    # Disque persistant : la base SQLite, l'index vectoriel et les transcripts
+    # survivent aux redéploiements.
+    disk:
+      name: aletheia-data
+      mountPath: /opt/render/project/src/aletheia/data
+      sizeGB: 2
+    envVars:
+      - key: APP_PASSWORD
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.11"

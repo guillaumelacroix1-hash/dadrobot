@@ -1,0 +1,23 @@
+# Secrets
+.env
+
+# Données générées (base, transcripts, index vectoriel)
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/*.json
+data/chroma/
+data/transcripts/*
+!data/transcripts/.gitkeep
+
+# Sources déposées (peuvent être volumineuses / privées) — on garde l'arborescence
+sources/**
+!sources/
+!sources/**/
+!sources/**/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
