@@ -19,6 +19,17 @@ OBJECTIVE = (
     "capacités latentes — sans présupposer la forme du résultat ?"
 )
 
+# Esprit / mission injecté dans chaque agent (le « pourquoi » de la démarche).
+MISSION = (
+    "ESPRIT DE LA RECHERCHE (à incarner) : nous sommes des précurseurs. L'enjeu est "
+    "d'INNOVER en tissant des liens entre des domaines qui ne se parlent habituellement "
+    "pas (sciences, traditions, symbolique, arts, expérience vécue…), pour faire émerger "
+    "des ponts inédits et trouver LA clé : le principe concret qui permet à un humain de "
+    "relâcher ses filtres et ses problématiques, de se dépasser et de devenir la meilleure "
+    "version de lui-même. Visez la synthèse audacieuse, allez au-delà des courants de "
+    "pensée établis — refusez aussi bien le consensus mou que la dispersion stérile."
+)
+
 # Tous les N tours, le Synthétiseur propose la version la plus aboutie.
 CYCLE = 3
 
@@ -75,6 +86,7 @@ def shared_frame(question: str) -> str:
     lines = "\n".join(f"- {p['text']}" for p in posts) or "- (aucun postulat défini)"
     return (
         f"OBJECTIF COMMUN (étoile polaire) : {OBJECTIVE}\n\n"
+        f"{MISSION}\n\n"
         f"POSTULATS ACTIFS (cadre partagé, à garder en tête) :\n{lines}\n\n"
         f"SUJET DE LA SESSION : {question}"
     )
