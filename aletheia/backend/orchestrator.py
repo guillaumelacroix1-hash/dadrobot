@@ -50,14 +50,38 @@ def parse_consensus(text: str) -> tuple[int | None, str]:
     return score, state
 
 
-def parse_nuggets(text: str) -> list[str]:
-    """Lit les lignes 'PÉPITE CANDIDATE : …' proposées à la convergence."""
-    out = []
-    for m in re.finditer(r"P[ÉE]PITE\s+CANDIDATE\s*[:=]\s*(.+)", text or "", re.IGNORECASE):
-        s = m.group(1).strip(" *-—:").strip()
-        if s:
-            out.append(s)
-    return out[:3]
+def parse_nuggets(text: str) -> list[dict]:
+    """Lit les pépites candidates (+ leur contexte) proposées à la convergence."""
+    out, cur = [], None
+    for line in (text or "").splitlines():
+        m = re.match(r"\s*P[ÉE]PITE\s+CANDIDATE\s*[:=]\s*(.+)", line, re.IGNORECASE)
+        if m:
+            if cur:
+                out.append(cur)
+            cur = {"text": m.group(1).strip(" *-—:").strip(), "context": ""}
+            continue
+        if cur is not None:
+            cm = re.match(r"\s*CONTEXTE\s*[:=]\s*(.+)", line, re.IGNORECASE)
+            if cm:
+                cur["context"] = cm.group(1).strip(" *-—:").strip()
+    if cur:
+        out.append(cur)
+    return [n for n in out if n["text"]][:3]
+
+
+async def explain_highlight(text: str, debate_id: int) -> str:
+    """2-3 phrases de contexte pour une pépite épinglée à la main (générées par Claude)."""
+    question = (db.get_debate(debate_id) or {}).get("question", "")
+    system = ("Tu documentes les idées clés d'un débat. Réponds en 2-3 phrases claires, "
+              "en français, sans préambule ni formule d'introduction.")
+    user = (f"SUJET DU DÉBAT : {question}\n\nIDÉE ÉPINGLÉE :\n{text}\n\n"
+            "Explique brièvement : ce que cette idée veut dire, d'où elle vient et "
+            "pourquoi elle est notable.")
+    try:
+        return await llm.chat("anthropic", "claude-sonnet-4-6", system, user,
+                              temperature=0.4, max_tokens=220)
+    except Exception:  # noqa: BLE001
+        return ""
 
 
 FICHE_INSTRUCTION = (
@@ -244,7 +268,9 @@ class DebateRuntime:
                         "(testable concrètement avec un signe observable, nouvelle, et "
                         "soutenue par plusieurs spécialités OU née d'une tension féconde), "
                         "signale-la sur sa propre ligne « PÉPITE CANDIDATE : <une phrase "
-                        "claire> » (0 à 2 maximum, seulement si ça le mérite vraiment). "
+                        "claire> », suivie d'une ligne « CONTEXTE : <2-3 phrases : ce que ça "
+                        "veut dire, d'où ça vient dans le débat, pourquoi c'est notable> » "
+                        "(0 à 2 pépites maximum, seulement si ça le mérite vraiment). "
                         "Termine par une ligne "
                         "« CONSENSUS : NN/100 (état: convergence | blocage | chambre "
                         "d'écho) » évaluant honnêtement où en est le cercle.",
@@ -254,10 +280,11 @@ class DebateRuntime:
                         db.add_metric(self.debate_id, rnd, score, state)
                         await self.emit({"type": "consensus", "round": rnd,
                                          "consensus": score, "state": state})
-                        for txt in parse_nuggets(conv["content"]):
-                            db.add_highlight(txt, self.debate_id, conv["id"],
-                                             note="Modérateur · candidate", status="candidate")
-                            await self.emit({"type": "nugget", "text": txt})
+                        for n in parse_nuggets(conv["content"]):
+                            db.add_highlight(n["text"], self.debate_id, conv["id"],
+                                             note="Modérateur · candidate", status="candidate",
+                                             context=n["context"])
+                            await self.emit({"type": "nugget", "text": n["text"]})
                 if exp:
                     await self._speak(exp, rnd, "protocole", FICHE_INSTRUCTION,
                                       use_rag=False)

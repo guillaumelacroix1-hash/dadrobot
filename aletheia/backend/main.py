@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from . import auth, config, db, ingestion, rag
 from .agents import (Agent, delete_agent, load_agent, load_agents, save_agent,
                      update_levers)
-from .orchestrator import OBJECTIVE, manager
+from .orchestrator import OBJECTIVE, explain_highlight, manager
 
 app = FastAPI(title="Aletheia")
 
@@ -295,6 +295,7 @@ class HighlightIn(BaseModel):
     turn_id: int | None = None
     note: str = ""
     status: str = "epinglee"
+    context: str = ""
 
 
 @app.get("/api/highlights", dependencies=[Depends(auth.require_auth)])
@@ -303,8 +304,13 @@ def get_highlights():
 
 
 @app.post("/api/highlights", dependencies=[Depends(auth.require_auth)])
-def create_highlight(body: HighlightIn):
-    hid = db.add_highlight(body.text, body.debate_id, body.turn_id, body.note, body.status)
+async def create_highlight(body: HighlightIn):
+    # Contexte : fourni par le Modérateur pour les candidates ; sinon généré (Claude).
+    context = body.context
+    if not context and body.debate_id:
+        context = await explain_highlight(body.text, body.debate_id)
+    hid = db.add_highlight(body.text, body.debate_id, body.turn_id, body.note,
+                           body.status, context)
     return {"id": hid}
 
 

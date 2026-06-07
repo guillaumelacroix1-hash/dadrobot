@@ -113,6 +113,8 @@ def init_db() -> None:
         if "status" not in cols:
             c.execute("ALTER TABLE highlights ADD COLUMN status TEXT NOT NULL "
                       "DEFAULT 'epinglee'")  # epinglee / candidate / confirmee / ecartee
+        if "context" not in cols:
+            c.execute("ALTER TABLE highlights ADD COLUMN context TEXT NOT NULL DEFAULT ''")
 
 
 # --------------------------------------------------------------------- débats
@@ -282,12 +284,12 @@ def list_sources(agent_id: str | None = None) -> list[dict[str, Any]]:
 # ------------------------------------------------------------------- pépites
 def add_highlight(text: str, debate_id: int | None = None,
                   turn_id: int | None = None, note: str = "",
-                  status: str = "epinglee") -> int:
+                  status: str = "epinglee", context: str = "") -> int:
     with _conn() as c:
         cur = c.execute(
-            "INSERT INTO highlights (debate_id, turn_id, text, note, status, created_at) "
-            "VALUES (?,?,?,?,?,?)",
-            (debate_id, turn_id, text, note, status, now()),
+            "INSERT INTO highlights (debate_id, turn_id, text, note, status, context, created_at) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (debate_id, turn_id, text, note, status, context, now()),
         )
         return int(cur.lastrowid)
 
