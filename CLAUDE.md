@@ -48,6 +48,15 @@ par débat »).
 - **Avancement** : par défaut le débat **enchaîne les tours automatiquement jusqu'au
   consensus** (≥ 75 %, évalué par le Modérateur) ou jusqu'à `max_rounds` (8) → puis pause
   pour test réel. Mode « pas à pas » possible (pause à chaque tour).
+- **Qui parle (depuis juin 2026)** : par défaut **TOUS les praticiens cochés parlent à
+  chaque tour** ; la restriction par le Modérateur (3-6 intervenants) est **opt-in**
+  (case à cocher). Tous les réglages du lancement (participants, modérateur, avancement,
+  cadre) sont **persistés en base et restaurés au resume**.
+- **Anti-« fil rouge »** : l'objectif éveil et le postulat MISSION ne s'appliquent par
+  défaut qu'au mode **Protocole** ; en Synthèse/Libre l'UI vide l'objectif (cadre neutre
+  côté moteur si objectif vide) et décoche MISSION. Posture praticiens, critères de
+  pépites, synthèse de cycle et garde-fou sont **adaptés au mode** (plus de pression
+  « testable » hors Protocole).
 - **Cadre par débat** : chaque débat a son **objectif** (étoile polaire propre), ses **axiomes
   choisis** (postulats cochés au lancement) et son **type de livrable**
   (`protocole` | `synthese` | `libre`). → on peut débattre de **n'importe quel sujet** sans
@@ -77,8 +86,13 @@ par débat »).
   redémarrage serveur, en relisant le cadre depuis la base (`/api/debates/{id}/resume`).
 - **Robustesse LLM** (`llm.py`) : retry/back-off sur `429/5xx`, masquage des balises
   `<think>…</think>` (modèles raisonneurs), **User-Agent explicite** (sinon Groq renvoie 403).
-- **Accès web par agent** (`Agent.web`, toggle 🌐, off par défaut) : plugin de recherche web
-  OpenRouter (`plugins:[{id:web,max_results:3}]`) → résultats frais injectés (praticiens only).
+- **Accès web par agent** (`Agent.web`, toggle 🌐) : plugin de recherche web OpenRouter
+  (`plugins:[{id:web,max_results:3}]`) → résultats frais injectés (praticiens only).
+  La recherche ne se fait **qu'à la phase « position »** (coût/latence maîtrisés,
+  ~1 centime/recherche). Activé sur les 6 agents « factuels » (neurosciences, biophysique,
+  physique_quantique, mathematiques, resonance, mythologie) — à chaud sur le VPS.
+- **Lecture du fil** : filtres par phase (Tout / ✨ L'essentiel / Positions / Critiques /
+  🔆 En clair) + **repli des messages > 1500 caractères** (« Tout afficher »).
 - **Vulgarisation** : à la fin de **chaque tour**, un message « 🔆 En clair » (phase
   `vulgarisation`, agent `vulgarisateur`) résume les trouvailles en langage simple (via Claude).
 

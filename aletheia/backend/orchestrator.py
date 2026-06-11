@@ -29,7 +29,7 @@ CYCLE = 3
 def parse_agent_selection(text: str, all_prats: list) -> list:
     """Lit la ligne 'AGENTS À SOLLICITER : id1, id2…' du cadrage. Repli : tous."""
     ids = {a.id for a in all_prats}
-    m = re.search(r"AGENTS? À SOLLICITER\s*[:=]\s*(.+)", text or "", re.IGNORECASE)
+    m = re.search(r"AGENTS?\s+[ÀA]\s+SOLLICITER\s*[:=*]*\s*(.+)", text or "", re.IGNORECASE)
     if not m:
         return all_prats
     chosen = {tok.strip().lower() for tok in re.split(r"[,;/]| et ", m.group(1))}
@@ -151,8 +151,13 @@ def shared_frame(question: str, objective: str = "", postulate_ids=None) -> str:
         ids = set(postulate_ids)
         posts = [p for p in posts if p["id"] in ids]
     lines = "\n".join(f"- {p['text']}" for p in posts) or "- (aucun postulat défini)"
+    # Objectif vide = pas de fil rouge imposé : on sert la question, point.
+    obj = (objective or "").strip()
+    header = (f"OBJECTIF COMMUN (étoile polaire) : {obj}" if obj else
+              "OBJECTIF COMMUN : répondre à la question de la session avec profondeur, "
+              "rigueur et originalité — sans autre agenda que le sujet lui-même.")
     return (
-        f"OBJECTIF COMMUN (étoile polaire) : {objective or OBJECTIVE}\n\n"
+        f"{header}\n\n"
         f"POSTULATS ACTIFS (cadre partagé, à garder en tête) :\n{lines}\n\n"
         f"SUJET DE LA SESSION : {question}"
     )
@@ -161,7 +166,7 @@ def shared_frame(question: str, objective: str = "", postulate_ids=None) -> str:
 class DebateRuntime:
     def __init__(self, debate_id: int, question: str,
                  participants: list[str] | None = None,
-                 moderator_selects: bool = True,
+                 moderator_selects: bool = False,
                  auto_advance: bool = True,
                  consensus_target: int = 75,
                  max_rounds: int = 8,
@@ -263,13 +268,21 @@ class DebateRuntime:
             system += ("\n\nORIENTATION PARTICULIÈRE (consigne de l'humain, propre à toi, "
                        f"à suivre dans tes interventions) :\n{agent.orientation}")
         if agent.role == "praticien":
-            system += (
-                "\n\nPOSTURE DE TRAVAIL : ce cénacle GÉNÈRE des hypothèses concrètes et "
-                "testables. Explore l'idée à fond, sans réflexe de débunkage ni disclaimers "
-                "à répétition. Reste intellectuellement honnête : distingue clairement ce qui "
-                "est établi de ce qui est spéculatif, mais propose des pistes même non prouvées "
-                "— l'absence de preuve publique ne vaut pas preuve du contraire. Sois à la fois "
-                "audacieux et rigoureux.")
+            if self.deliverable == "protocole":
+                system += (
+                    "\n\nPOSTURE DE TRAVAIL : ce cénacle GÉNÈRE des hypothèses concrètes et "
+                    "testables. Explore l'idée à fond, sans réflexe de débunkage ni disclaimers "
+                    "à répétition. Reste intellectuellement honnête : distingue clairement ce qui "
+                    "est établi de ce qui est spéculatif, mais propose des pistes même non prouvées "
+                    "— l'absence de preuve publique ne vaut pas preuve du contraire. Sois à la fois "
+                    "audacieux et rigoureux.")
+            else:
+                system += (
+                    "\n\nPOSTURE DE TRAVAIL : explore le sujet librement et à fond, sans réflexe "
+                    "de débunkage ni disclaimers à répétition. Aucun protocole ni livrable n'est "
+                    "attendu de toi : la profondeur de la réflexion prime. Reste honnête "
+                    "(distingue l'établi du spéculatif), ose des angles neufs et des ponts entre "
+                    "domaines, et réponds au sujet pour lui-même.")
             if getattr(agent, "learning", True):
                 learns = db.list_learnings(agent.id, exclude_debate=self.debate_id)
                 if learns:
@@ -277,10 +290,12 @@ class DebateRuntime:
                     system += ("\n\nTES PRISES DE CONSCIENCE DES DÉBATS PRÉCÉDENTS (acquis à "
                                f"intégrer, fruit de ton expérience passée) :\n{mem}")
         try:
+            # Recherche web au moment des positions (la phase où creuser compte) ;
+            # pas aux critiques, pour limiter coût et latence.
             content = await llm.chat(agent.provider, agent.model, system, user,
                                      agent.temperature, agent.top_p,
                                      max_tokens=max_tokens,
-                                     web=getattr(agent, "web", False))
+                                     web=getattr(agent, "web", False) and phase == "position")
         except llm.LLMError as e:
             content = f"⚠️ Modèle indisponible ({agent.name}) : {e}"
         return await self.emit_turn(rnd, phase, agent, content)
@@ -335,13 +350,17 @@ class DebateRuntime:
                                       "majorité par confort : si tu n'es pas convaincu, "
                                       "dis-le et défends ta position de minorité. Concis.")
                 if mod:
+                    nug_crit = (
+                        "testable concrètement avec un signe observable, nouvelle, et "
+                        "soutenue par plusieurs spécialités OU née d'une tension féconde"
+                        if self.deliverable == "protocole" else
+                        "vraiment marquante : un pont inédit entre domaines, une idée "
+                        "structurante, ou une réponse forte à la question de la session")
                     conv = await self._speak(
                         mod, rnd, "convergence",
                         "Extrais les 2-3 pistes les plus prometteuses du tour "
                         "(numérote-les). Ajoute une ligne RAPPORT MINORITAIRE (avis "
-                        "dissidents à garder). Si une piste est VRAIMENT prometteuse "
-                        "(testable concrètement avec un signe observable, nouvelle, et "
-                        "soutenue par plusieurs spécialités OU née d'une tension féconde), "
+                        f"dissidents à garder). Si une piste est {nug_crit}, "
                         "signale-la sur sa propre ligne « PÉPITE CANDIDATE : <une phrase "
                         "claire> », suivie d'une ligne « CONTEXTE : <2-3 phrases : ce que ça "
                         "veut dire, d'où ça vient dans le débat, pourquoi c'est notable> » "
@@ -370,18 +389,28 @@ class DebateRuntime:
                 if avc:
                     await self._speak(avc, rnd, "garde-fou",
                                       "Signale risques, biais et points invérifiables "
-                                      "des pistes et du protocole. Bref et franc.",
+                                      "des pistes du tour (et du livrable s'il y en a un). "
+                                      "Bref et franc.",
                                       use_rag=False)
 
                 # Synthèse de cycle : tous les CYCLE tours, la meilleure version à ce jour.
                 if syn and rnd % CYCLE == 0:
-                    await self._speak(
-                        syn, rnd, "synthese",
-                        "Relis l'ensemble du débat (résumé + tours récents + retours de "
-                        "tests) et propose LA VERSION LA PLUS ABOUTIE de la technique à "
-                        "ce stade : un protocole unique, intégré et concret, qui combine "
-                        "le meilleur de toutes les pistes. Mentionne ce qu'il reste à "
-                        "valider.", use_rag=False, max_tokens=4000)
+                    if self.deliverable == "protocole":
+                        syn_instr = (
+                            "Relis l'ensemble du débat (résumé + tours récents + retours de "
+                            "tests) et propose LA VERSION LA PLUS ABOUTIE de la technique à "
+                            "ce stade : un protocole unique, intégré et concret, qui combine "
+                            "le meilleur de toutes les pistes. Mentionne ce qu'il reste à "
+                            "valider.")
+                    else:
+                        syn_instr = (
+                            "Relis l'ensemble du débat (résumé + tours récents + apports de "
+                            "l'humain) et propose LA RÉPONSE LA PLUS ABOUTIE à la question à "
+                            "ce stade : une synthèse intégrée qui combine le meilleur de "
+                            "toutes les contributions. Mentionne les questions encore "
+                            "ouvertes.")
+                    await self._speak(syn, rnd, "synthese", syn_instr,
+                                      use_rag=False, max_tokens=4000)
 
                 # Vulgarisation de fin de tour : un résumé clair, sans jargon.
                 src = ""
@@ -433,13 +462,16 @@ class DebateManager:
         self.runtimes: dict[int, DebateRuntime] = {}
 
     def start(self, question: str, participants: list[str] | None = None,
-              moderator_selects: bool = True, auto_advance: bool = True,
+              moderator_selects: bool = False, auto_advance: bool = True,
               consensus_target: int = 75, max_rounds: int = 8,
               objective: str = "", postulate_ids=None,
               deliverable: str = "protocole") -> int:
         debate_id = db.create_debate(
             question, objective,
-            json.dumps(postulate_ids) if postulate_ids else "", deliverable)
+            json.dumps(postulate_ids) if postulate_ids else "", deliverable,
+            participants=json.dumps(participants) if participants else "",
+            moderator_selects=moderator_selects, auto_advance=auto_advance,
+            consensus_target=consensus_target, max_rounds=max_rounds)
         rt = DebateRuntime(debate_id, question, participants, moderator_selects,
                            auto_advance, consensus_target, max_rounds,
                            objective, postulate_ids, deliverable)
@@ -471,7 +503,16 @@ class DebateManager:
             pids = json.loads(d.get("postulate_ids") or "") or None
         except Exception:  # noqa: BLE001
             pids = None
+        try:
+            parts = json.loads(d.get("participants") or "") or None
+        except Exception:  # noqa: BLE001
+            parts = None
         rt = DebateRuntime(debate_id, d["question"],
+                           participants=parts,
+                           moderator_selects=bool(d.get("moderator_selects") or 0),
+                           auto_advance=bool(d.get("auto_advance", 1)),
+                           consensus_target=int(d.get("consensus_target") or 75),
+                           max_rounds=int(d.get("max_rounds") or 8),
                            objective=d.get("objective", ""), postulate_ids=pids,
                            deliverable=d.get("deliverable", "protocole"))
         self.runtimes[debate_id] = rt

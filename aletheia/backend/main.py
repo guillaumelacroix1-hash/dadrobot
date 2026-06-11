@@ -224,7 +224,7 @@ async def add_file_source(agent_id: str, title: str, file: UploadFile):
 class DebateIn(BaseModel):
     question: str
     participants: list[str] | None = None   # ids des praticiens autorisés (None = tous)
-    moderator_selects: bool = True           # le Modérateur affine-t-il à chaque tour ?
+    moderator_selects: bool = False          # opt-in : le Modérateur restreint qui parle
     auto_advance: bool = True                # enchaîner les tours jusqu'au consensus
     consensus_target: int = 75               # seuil de consensus (%) déclenchant l'arrêt
     max_rounds: int = 8                      # garde-fou : nb de tours max en mode auto
@@ -240,9 +240,12 @@ def get_debates():
 
 @app.post("/api/debates", dependencies=[Depends(auth.require_auth)])
 async def start_debate(body: DebateIn):
-    debate_id = manager.start(body.question, body.participants, body.moderator_selects,
-                              body.auto_advance, body.consensus_target, body.max_rounds,
-                              body.objective, body.postulate_ids, body.deliverable)
+    debate_id = manager.start(
+        body.question, participants=body.participants,
+        moderator_selects=body.moderator_selects, auto_advance=body.auto_advance,
+        consensus_target=body.consensus_target, max_rounds=body.max_rounds,
+        objective=body.objective, postulate_ids=body.postulate_ids,
+        deliverable=body.deliverable)
     return {"id": debate_id}
 
 

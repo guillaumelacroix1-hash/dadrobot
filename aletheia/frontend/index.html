@@ -51,6 +51,18 @@
     /* Petit point de couleur d'agent pour repérage rapide */
     .turn-block{scroll-margin-top:8px}
 
+    /* Filtres de lecture du fil */
+    .fchip{padding:.15rem .6rem;border-radius:9999px;font-size:11px;background:#33415599;color:#94a3b8}
+    .fchip:hover{background:#475569;color:#e2e8f0}
+    .fchip.on{background:rgba(4,120,87,.55);color:#a7f3d0}
+    /* Messages longs repliés (dégradé assorti au fond de la carte) */
+    .md.collapsed{max-height:17rem;overflow:hidden;position:relative}
+    .md.collapsed::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3.5rem;
+      background:linear-gradient(transparent,#0f172a);pointer-events:none}
+    .phase-vulgarisation .md.collapsed::after{background:linear-gradient(transparent,#082f49)}
+    .phase-humain .md.collapsed::after{background:linear-gradient(transparent,#3f300a)}
+    .phase-synthese .md.collapsed::after{background:linear-gradient(transparent,#042f2e)}
+
     /* Scrollbars élégantes, dans le ton (Firefox) */
     *{scrollbar-width:thin;scrollbar-color:#3a4a5e transparent}
     /* Scrollbars élégantes (WebKit : Chrome/Edge/Safari) */
@@ -109,15 +121,15 @@
         <div class="mt-3 space-y-3 text-xs">
           <div>
             <label class="text-slate-400">Objectif / étoile polaire de CE débat</label>
-            <textarea id="objectiveInput" rows="2" placeholder="L'objectif global que poursuivent les agents pour ce débat" class="w-full mt-1 bg-slate-900 border border-slate-700 rounded p-2"></textarea>
+            <textarea id="objectiveInput" rows="2" placeholder="Laisse vide : les agents répondent simplement à la question, sans fil rouge imposé." class="w-full mt-1 bg-slate-900 border border-slate-700 rounded p-2"></textarea>
           </div>
           <div>
             <label class="text-slate-400">Axiomes applicables (décoche ceux hors-sujet)</label>
             <div id="postulateSelect" class="mt-1 space-y-1 max-h-44 overflow-y-auto pr-1"></div>
           </div>
           <div>
-            <label class="text-slate-400">Livrable visé à chaque tour</label>
-            <select id="deliverable" class="mt-1 bg-slate-900 border border-slate-700 rounded p-2 w-full">
+            <label class="text-slate-400">Type de débat (livrable visé à chaque tour)</label>
+            <select id="deliverable" onchange="syncObjectiveWithMode()" class="mt-1 bg-slate-900 border border-slate-700 rounded p-2 w-full">
               <option value="protocole">🧪 Protocole testable (défaut)</option>
               <option value="synthese">📝 Synthèse &amp; recommandations</option>
               <option value="libre">💬 Exploration libre (sans livrable imposé)</option>
@@ -134,8 +146,8 @@
           </div>
           <div id="participantList" class="grid grid-cols-2 md:grid-cols-3 gap-x-3 gap-y-1"></div>
           <label class="flex items-center gap-2 text-xs text-slate-400 pt-1">
-            <input type="checkbox" id="moderatorSelects" checked class="accent-emerald-500"/>
-            Laisser le Modérateur affiner qui parle à chaque tour <span class="text-slate-600">(sinon tous les cochés parlent à chaque tour)</span>
+            <input type="checkbox" id="moderatorSelects" class="accent-emerald-500"/>
+            Laisser le Modérateur restreindre à 3-6 intervenants par tour <span class="text-slate-600">(décoché = TOUS les praticiens cochés parlent à chaque tour)</span>
           </label>
         </div>
       </details>
@@ -202,6 +214,14 @@
               <button id="btnClose" onclick="closeDebate()" title="Clôturer et consolider l'apprentissage des agents" class="px-2 py-1 rounded bg-indigo-600/80 hover:bg-indigo-500 text-xs">📚 Clôturer</button>
             </div>
           </div>
+        </div>
+        <div id="feedFilters" class="hidden flex flex-wrap items-center gap-1.5 mb-2">
+          <span class="text-[10px] text-slate-600 mr-1">Afficher :</span>
+          <button class="fchip" data-f="tout">Tout</button>
+          <button class="fchip" data-f="essentiel">✨ L'essentiel</button>
+          <button class="fchip" data-f="position">🟢 Positions</button>
+          <button class="fchip" data-f="critique">🟠 Critiques</button>
+          <button class="fchip" data-f="vulgarisation">🔆 En clair</button>
         </div>
         <div id="liveFeed" class="liveFeed space-y-3 max-h-[74vh] overflow-y-auto pr-2 scroll-smooth">
           <p class="text-slate-500 text-sm">Sélectionne ou lance un débat pour voir les échanges en direct.</p>
@@ -457,14 +477,31 @@ async function init(){
   $("warnings").innerHTML = w.join("<br>");
   loadDebates(); loadAgents(); loadLaunchCadre();
 }
+let defaultObjective = "";
 async function loadLaunchCadre(){
   try{
     const s = await api("/api/status");
-    if($("objectiveInput") && !$("objectiveInput").value.trim()) $("objectiveInput").value = s.objective||"";
+    defaultObjective = s.objective || "";
     const posts = await api("/api/postulates");
     if($("postulateSelect")) $("postulateSelect").innerHTML =
       posts.filter(p=>p.active).map(p=>`<label class="flex items-start gap-1.5"><input type="checkbox" class="post-cb accent-emerald-500 mt-0.5" value="${p.id}" checked/><span>${escapeHtml(p.text)}</span></label>`).join("") || '<span class="text-slate-600">aucun axiome actif</span>';
+    syncObjectiveWithMode();
   }catch(e){}
+}
+// Le type de débat pilote le cadre : l'objectif « éveil » et la MISSION ne
+// s'appliquent par défaut qu'au mode Protocole — les autres modes partent neutres.
+function syncObjectiveWithMode(){
+  const o = $("objectiveInput"); if(!o) return;
+  const mode = ($("deliverable")||{}).value || "protocole";
+  if(mode === "protocole"){
+    if(!o.value.trim()) o.value = defaultObjective;
+  } else if(o.value.trim() === defaultObjective.trim()){
+    o.value = "";
+  }
+  document.querySelectorAll('.post-cb').forEach(cb=>{
+    const label = (cb.parentElement.textContent || "").trim();
+    if(/^MISSION/i.test(label)) cb.checked = (mode === "protocole");
+  });
 }
 
 // -------- Débats --------
@@ -488,7 +525,7 @@ async function startDebate(){
   const auto = ((document.querySelector('input[name="advMode"]:checked')||{}).value !== "step");
   const body = {
     question:q,
-    moderator_selects: $("moderatorSelects") ? $("moderatorSelects").checked : true,
+    moderator_selects: $("moderatorSelects") ? $("moderatorSelects").checked : false,
     auto_advance: auto,
     consensus_target: parseInt(($("consensusTarget")||{}).value)||75,
     max_rounds: parseInt(($("maxRounds")||{}).value)||8,
@@ -518,6 +555,7 @@ async function openDebate(id){
   $("liveHeader").classList.remove("hidden");
   $("humanBox").classList.remove("hidden");
   $("planCard").classList.remove("hidden");
+  $("feedFilters").classList.remove("hidden");
   $("liveId").textContent = id;
   $("liveTitle").textContent = d.debate.title || ("Débat #"+id);
   $("liveQuestion").textContent = d.debate.question;
@@ -617,6 +655,7 @@ function renderTurn(t){
   el.dataset.turnId = t.id ?? "";
   el.dataset.debateId = t.debate_id ?? (currentDebate||"");
   el.dataset.agent = t.agent_name || "";
+  el.dataset.phase = t.phase || "";
   const star = t.phase==="humain" ? "" :
     `<button title="Épingler tout le message" onclick="pinTurn(${t.id})" class="text-xs text-slate-500 hover:text-yellow-400">⭐</button>`;
   const body = isErr
@@ -627,10 +666,40 @@ function renderTurn(t){
       <span class="flex items-center gap-2">
         <span class="text-[10px] px-1.5 py-0.5 rounded ${pcls}">${plabel}</span>${star}
       </span></div>${body}`;
+  // Messages longs : repliés avec « Tout afficher » (le plan reste complet).
+  if(!isErr && (t.content||"").length > 1500){
+    const md = el.querySelector(".md");
+    if(md){
+      md.classList.add("collapsed");
+      const btn = document.createElement("button");
+      btn.className = "text-[11px] text-emerald-400 hover:text-emerald-300 mt-1";
+      btn.textContent = "▾ Tout afficher";
+      btn.onclick = () => { const c = md.classList.toggle("collapsed"); btn.textContent = c ? "▾ Tout afficher" : "▴ Réduire"; };
+      el.appendChild(btn);
+    }
+  }
+  if(!matchFilter(t.phase)) el.classList.add("hidden");
   $("liveFeed").appendChild(el);
   addPlanItem(t);
   if(!autoScroll){ const b=$("newMsgBtn"); if(b) b.classList.remove("hidden"); }
   scrollFeed();
+}
+
+// -------- Filtre de lecture du fil --------
+let feedFilter = "tout";
+const ESSENTIEL = new Set(["cadrage","convergence","protocole","garde-fou","synthese","vulgarisation","humain"]);
+function matchFilter(ph){
+  if(feedFilter==="tout") return true;
+  if(feedFilter==="essentiel") return ESSENTIEL.has(ph);
+  return ph===feedFilter;
+}
+function applyFeedFilter(){
+  document.querySelectorAll("#liveFeed .turn-block").forEach(el=>{
+    el.classList.toggle("hidden", !matchFilter(el.dataset.phase||""));
+  });
+}
+function paintChips(){
+  document.querySelectorAll(".fchip").forEach(x=>x.classList.toggle("on", x.dataset.f===feedFilter));
 }
 async function pinTurn(id){
   const t = turnsById[id]; if(!t) return;
@@ -985,6 +1054,10 @@ async function saveSettings(){
   document.documentElement.style.setProperty('--feed-fs', feedFs+'rem');
   const f=$("liveFeed"); if(f) f.addEventListener('scroll', onFeedScroll);
   syncFollowBtn();
+  document.querySelectorAll(".fchip").forEach(b=>b.onclick=()=>{
+    feedFilter = b.dataset.f; paintChips(); applyFeedFilter();
+  });
+  paintChips();
 })();
 
 boot();

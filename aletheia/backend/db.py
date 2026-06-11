@@ -133,17 +133,33 @@ def init_db() -> None:
             c.execute("ALTER TABLE debates ADD COLUMN deliverable TEXT NOT NULL DEFAULT 'protocole'")
         if "title" not in dcols:
             c.execute("ALTER TABLE debates ADD COLUMN title TEXT NOT NULL DEFAULT ''")
+        # Réglages du débat persistés (pour que la reprise respecte les choix du lancement).
+        for col, ddl in (
+            ("participants", "TEXT NOT NULL DEFAULT ''"),
+            ("moderator_selects", "INTEGER NOT NULL DEFAULT 0"),
+            ("auto_advance", "INTEGER NOT NULL DEFAULT 1"),
+            ("consensus_target", "INTEGER NOT NULL DEFAULT 75"),
+            ("max_rounds", "INTEGER NOT NULL DEFAULT 8"),
+        ):
+            if col not in dcols:
+                c.execute(f"ALTER TABLE debates ADD COLUMN {col} {ddl}")
 
 
 # --------------------------------------------------------------------- débats
 def create_debate(question: str, objective: str = "", postulate_ids: str = "",
-                  deliverable: str = "protocole") -> int:
+                  deliverable: str = "protocole", participants: str = "",
+                  moderator_selects: bool = False, auto_advance: bool = True,
+                  consensus_target: int = 75, max_rounds: int = 8) -> int:
     t = now()
     with _conn() as c:
         cur = c.execute(
             "INSERT INTO debates (question, status, round, objective, postulate_ids, "
-            "deliverable, created_at, updated_at) VALUES (?, 'en cours', 0, ?, ?, ?, ?, ?)",
-            (question, objective, postulate_ids, deliverable, t, t),
+            "deliverable, participants, moderator_selects, auto_advance, "
+            "consensus_target, max_rounds, created_at, updated_at) "
+            "VALUES (?, 'en cours', 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (question, objective, postulate_ids, deliverable, participants,
+             int(moderator_selects), int(auto_advance), consensus_target,
+             max_rounds, t, t),
         )
         return int(cur.lastrowid)
 
