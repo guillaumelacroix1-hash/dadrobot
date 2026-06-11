@@ -972,12 +972,16 @@ const PEPITE_META = {
   confirmee:["✅ Confirmée","bg-emerald-500/20 text-emerald-300","border-emerald-500"],
 };
 const PEPITE_ORDER = {candidate:0, epinglee:1, confirmee:2};
+let pepitesCache = {};
+function unesc(s){ return (s||"").replace(/\\n/g, "\n"); }   /* « \n » littéraux écrits par les modèles */
 async function loadPepites(){
   const o = await api("/api/outputs");
   const visible = o.highlights
-    .map(h=>({...h, status:h.status||"epinglee"}))
+    .map(h=>({...h, status:h.status||"epinglee", text:unesc(h.text), context:unesc(h.context)}))
     .filter(h=>h.status!=="ecartee")
     .sort((a,b)=>(PEPITE_ORDER[a.status]??5)-(PEPITE_ORDER[b.status]??5));
+  pepitesCache = {};
+  visible.forEach(h=>{ pepitesCache[h.id]=h; });
   $("highlightList").innerHTML = visible.map(h=>{
     const [lbl,cls,brd] = PEPITE_META[h.status] || PEPITE_META.epinglee;
     let actions="";
@@ -985,11 +989,11 @@ async function loadPepites(){
       actions=`<button onclick="setPepite(${h.id},'epinglee')" class="text-xs bg-yellow-700/60 hover:bg-yellow-600 rounded px-2 py-1">Retenir</button>
         <button onclick="setPepite(${h.id},'ecartee')" class="text-xs text-slate-400 hover:text-red-300">Écarter</button>`;
     } else if(h.status==="confirmee"){
-      actions=`<button onclick='debateIdea(${JSON.stringify(h.text)})' class="text-xs bg-emerald-700/60 hover:bg-emerald-600 rounded px-2 py-1">Débattre</button>
+      actions=`<button onclick="debateIdea(${h.id})" class="text-xs bg-emerald-700/60 hover:bg-emerald-600 rounded px-2 py-1">Débattre</button>
         <button onclick="delHighlight(${h.id})" class="text-xs text-red-400 hover:text-red-300">Retirer</button>`;
     } else {
       actions=`<button onclick="setPepite(${h.id},'confirmee')" title="J'ai testé, ça marche" class="text-xs bg-emerald-800/70 hover:bg-emerald-700 rounded px-2 py-1">✅ Confirmée</button>
-        <button onclick='debateIdea(${JSON.stringify(h.text)})' class="text-xs bg-emerald-700/60 hover:bg-emerald-600 rounded px-2 py-1">Débattre</button>
+        <button onclick="debateIdea(${h.id})" class="text-xs bg-emerald-700/60 hover:bg-emerald-600 rounded px-2 py-1">Débattre</button>
         <button onclick="delHighlight(${h.id})" class="text-xs text-red-400 hover:text-red-300">Retirer</button>`;
     }
     return `<div class="bg-slate-900 rounded-lg p-3 border-l-4 ${brd}">
@@ -1016,8 +1020,9 @@ async function setPepite(id,status){
   loadPepites();
 }
 async function delHighlight(id){ await api("/api/highlights/"+id,{method:"DELETE"}); loadPepites(); }
-async function debateIdea(text){
-  const q = "Approfondir cette piste issue d'un débat précédent : " + text;
+async function debateIdea(id){
+  const h = pepitesCache[id]; if(!h) return;
+  const q = "Approfondir cette piste issue d'un débat précédent : " + h.text;
   const r = await api("/api/debates",{method:"POST",body:JSON.stringify({question:q})});
   document.querySelector('.tab-btn[data-tab="debats"]').click();
   await loadDebates(); openDebate(r.id);

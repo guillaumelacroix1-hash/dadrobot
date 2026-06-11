@@ -335,6 +335,10 @@ def list_sources(agent_id: str | None = None) -> list[dict[str, Any]]:
 def add_highlight(text: str, debate_id: int | None = None,
                   turn_id: int | None = None, note: str = "",
                   status: str = "epinglee", context: str = "") -> int:
+    # Les modèles compressent parfois leur pépite sur une ligne avec des « \n »
+    # littéraux : on les convertit en vrais sauts de ligne au stockage.
+    text = (text or "").replace("\\n", "\n").strip()
+    context = (context or "").replace("\\n", "\n").strip()
     with _conn() as c:
         cur = c.execute(
             "INSERT INTO highlights (debate_id, turn_id, text, note, status, context, created_at) "
